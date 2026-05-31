@@ -1,0 +1,28 @@
+{
+  "fixture": "maxit",
+  "initial_par": [0],
+  "lower": [-10],
+  "upper": [10],
+  "control": {
+    "maxit": 1,
+    "fnscale": 1,
+    "parscale": [1],
+    "ndeps": [0.001],
+    "factr": 10000000,
+    "pgtol": 0,
+    "lmm": 5
+  },
+  "gradient_supplied": true,
+  "result": {
+    "par": [2],
+    "value": 0,
+    "counts": {
+      "function": 4,
+      "gradient": 4
+    },
+    "convergence": 1,
+    "message": "NEW_X"
+  },
+  "r_version": "R version 4.3.3 (2024-02-29)",
+  "platform": "x86_64-pc-linux-gnu"
+}

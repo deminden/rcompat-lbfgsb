@@ -1,0 +1,189 @@
+{
+  "fixture": "deseq_nb_real_subset",
+  "source": {
+    "source_directory": "data/",
+    "committed_directory": "fixtures/deseq_real_subset/",
+    "note": "Small DESeq-derived real-data subset; optimizer fixture uses an independently written NB GLM objective without DESeq2 code."
+  },
+  "objective": "negative binomial GLM negative log likelihood without beta-independent constants",
+  "samples": 78,
+  "coefficients": 4,
+  "cases": [
+    {
+      "fixture": "deseq_nb_mtnd1p23",
+      "gene": "MTND1P23",
+      "reason": "actual_or_rough_optimizer_row",
+      "dispersion": 3.1618364293705499,
+      "initial_par": [40.734980136730897, 46.544801075871597, 19.038102770672999, -35.707621216485101],
+      "lower": [-30, -30, -30, -30],
+      "upper": [30, 30, 30, 30],
+      "control": {
+        "maxit": 100,
+        "fnscale": 1,
+        "parscale": [1, 1, 1, 1],
+        "ndeps": [0.001, 0.001, 0.001, 0.001],
+        "factr": 10000000,
+        "pgtol": 0,
+        "lmm": 5
+      },
+      "gradient_supplied": true,
+      "result": {
+        "par": [7.8672177715663283, -1.8686802853772235, 1.1975472165418133, -0.16402936860138451],
+        "value": 241.12338174471583,
+        "counts": {
+          "function": 48,
+          "gradient": 48
+        },
+        "convergence": 0,
+        "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+      }
+    },
+    {
+      "fixture": "deseq_nb_igkv1_27",
+      "gene": "IGKV1-27",
+      "reason": "actual_or_rough_optimizer_row",
+      "dispersion": 3.3733975035194099,
+      "initial_par": [274.18488345527498, -311.76713394216, -278.212740600095, 145.34657155691201],
+      "lower": [-30, -30, -30, -30],
+      "upper": [30, 30, 30, 30],
+      "control": {
+        "maxit": 100,
+        "fnscale": 1,
+        "parscale": [1, 1, 1, 1],
+        "ndeps": [0.001, 0.001, 0.001, 0.001],
+        "factr": 10000000,
+        "pgtol": 0,
+        "lmm": 5
+      },
+      "gradient_supplied": true,
+      "result": {
+        "par": [4.4814912772096864, -0.33849229786073398, -1.0200515476120222, 0.82108176602226246],
+        "value": 150.59902259726289,
+        "counts": {
+          "function": 47,
+          "gradient": 47
+        },
+        "convergence": 0,
+        "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+      }
+    },
+    {
+      "fixture": "deseq_nb_ppiap86",
+      "gene": "PPIAP86",
+      "reason": "force_optimizer_probe",
+      "dispersion": 78,
+      "initial_par": [-2.2073394943891498, 0.18280694394150199, 0.20086840710954501, -0.51336434237272499],
+      "lower": [-30, -30, -30, -30],
+      "upper": [30, 30, 30, 30],
+      "control": {
+        "maxit": 100,
+        "fnscale": 1,
+        "parscale": [1, 1, 1, 1],
+        "ndeps": [0.001, 0.001, 0.001, 0.001],
+        "factr": 10000000,
+        "pgtol": 0,
+        "lmm": 5
+      },
+      "gradient_supplied": true,
+      "result": {
+        "par": [-17.791600026278669, 15.487765494742527, 15.798854805819767, -30],
+        "value": 1.3450820807764503,
+        "counts": {
+          "function": 34,
+          "gradient": 34
+        },
+        "convergence": 0,
+        "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+      }
+    },
+    {
+      "fixture": "deseq_nb_ensg00000249901",
+      "gene": "ENSG00000249901",
+      "reason": "force_optimizer_probe",
+      "dispersion": 78,
+      "initial_par": [-2.0003558482311901, 0.62477230406082296, 0.28101338827879502, -0.92732288942294305],
+      "lower": [-30, -30, -30, -30],
+      "upper": [30, 30, 30, 30],
+      "control": {
+        "maxit": 100,
+        "fnscale": 1,
+        "parscale": [1, 1, 1, 1],
+        "ndeps": [0.001, 0.001, 0.001, 0.001],
+        "factr": 10000000,
+        "pgtol": 0,
+        "lmm": 5
+      },
+      "gradient_supplied": true,
+      "result": {
+        "par": [-15.641069256819737, 14.500727808755638, 13.730638397550925, -30],
+        "value": 1.575434651620826,
+        "counts": {
+          "function": 31,
+          "gradient": 31
+        },
+        "convergence": 0,
+        "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+      }
+    },
+    {
+      "fixture": "deseq_nb_ensg00000301330",
+      "gene": "ENSG00000301330",
+      "reason": "force_optimizer_probe",
+      "dispersion": 78,
+      "initial_par": [-2.0446856702812899, 0.60569605395944104, 0.20086479620534201, -0.83866476874664198],
+      "lower": [-30, -30, -30, -30],
+      "upper": [30, 30, 30, 30],
+      "control": {
+        "maxit": 100,
+        "fnscale": 1,
+        "parscale": [1, 1, 1, 1],
+        "ndeps": [0.001, 0.001, 0.001, 0.001],
+        "factr": 10000000,
+        "pgtol": 0,
+        "lmm": 5
+      },
+      "gradient_supplied": true,
+      "result": {
+        "par": [-14.916210295519608, 14.004657477217332, 12.602586874465118, -30],
+        "value": 1.5319259278698518,
+        "counts": {
+          "function": 28,
+          "gradient": 28
+        },
+        "convergence": 0,
+        "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+      }
+    },
+    {
+      "fixture": "deseq_nb_ensg00000305966",
+      "gene": "ENSG00000305966",
+      "reason": "force_optimizer_probe",
+      "dispersion": 78,
+      "initial_par": [-2.2088665156722702, 0.17883679030423499, 0.200868441009318, -0.51031036760634196],
+      "lower": [-30, -30, -30, -30],
+      "upper": [30, 30, 30, 30],
+      "control": {
+        "maxit": 100,
+        "fnscale": 1,
+        "parscale": [1, 1, 1, 1],
+        "ndeps": [0.001, 0.001, 0.001, 0.001],
+        "factr": 10000000,
+        "pgtol": 0,
+        "lmm": 5
+      },
+      "gradient_supplied": true,
+      "result": {
+        "par": [-18.826234001579088, 16.150870207032369, 16.866287355070629, -30],
+        "value": 1.281099080684805,
+        "counts": {
+          "function": 37,
+          "gradient": 37
+        },
+        "convergence": 0,
+        "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+      }
+    }
+  ],
+  "r_version": "R version 4.3.3 (2024-02-29)",
+  "platform": "x86_64-pc-linux-gnu"
+}

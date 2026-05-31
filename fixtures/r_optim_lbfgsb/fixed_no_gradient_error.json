@@ -1,0 +1,13 @@
+{
+  "fixture": "fixed_no_gradient_error",
+  "initial_par": [1.5],
+  "lower": [1.5],
+  "upper": [1.5],
+  "control": [],
+  "gradient_supplied": false,
+  "error": {
+    "message": "non-finite finite-difference value [1]"
+  },
+  "r_version": "R version 4.3.3 (2024-02-29)",
+  "platform": "x86_64-pc-linux-gnu"
+}

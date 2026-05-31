@@ -1,0 +1,28 @@
+{
+  "fixture": "active_upper_bound",
+  "initial_par": [-3],
+  "lower": [-10],
+  "upper": [0],
+  "control": {
+    "maxit": 100,
+    "fnscale": 1,
+    "parscale": [1],
+    "ndeps": [0.001],
+    "factr": 10000000,
+    "pgtol": 0,
+    "lmm": 5
+  },
+  "gradient_supplied": false,
+  "result": {
+    "par": [0],
+    "value": 4,
+    "counts": {
+      "function": 2,
+      "gradient": 2
+    },
+    "convergence": 0,
+    "message": "CONVERGENCE: NORM OF PROJECTED GRADIENT <= PGTOL"
+  },
+  "r_version": "R version 4.3.3 (2024-02-29)",
+  "platform": "x86_64-pc-linux-gnu"
+}

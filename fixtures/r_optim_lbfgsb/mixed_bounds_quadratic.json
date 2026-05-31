@@ -1,0 +1,28 @@
+{
+  "fixture": "mixed_bounds_quadratic",
+  "initial_par": [3, -4],
+  "lower": [0, "-Inf"],
+  "upper": ["Inf", 0],
+  "control": {
+    "maxit": 100,
+    "fnscale": 1,
+    "parscale": [1, 1],
+    "ndeps": [0.001, 0.001],
+    "factr": 10000000,
+    "pgtol": 0,
+    "lmm": 5
+  },
+  "gradient_supplied": true,
+  "result": {
+    "par": [1, -2],
+    "value": 0,
+    "counts": {
+      "function": 4,
+      "gradient": 4
+    },
+    "convergence": 0,
+    "message": "CONVERGENCE: NORM OF PROJECTED GRADIENT <= PGTOL"
+  },
+  "r_version": "R version 4.3.3 (2024-02-29)",
+  "platform": "x86_64-pc-linux-gnu"
+}

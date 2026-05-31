@@ -1,0 +1,28 @@
+{
+  "fixture": "two_dim_parscale_gradient",
+  "initial_par": [0, 0],
+  "lower": [-10, -10],
+  "upper": [10, 10],
+  "control": {
+    "maxit": 100,
+    "fnscale": 1,
+    "parscale": [2, 0.5],
+    "ndeps": [0.001, 0.001],
+    "factr": 10000000,
+    "pgtol": 0,
+    "lmm": 5
+  },
+  "gradient_supplied": true,
+  "result": {
+    "par": [4, -1],
+    "value": 0,
+    "counts": {
+      "function": 6,
+      "gradient": 6
+    },
+    "convergence": 0,
+    "message": "CONVERGENCE: NORM OF PROJECTED GRADIENT <= PGTOL"
+  },
+  "r_version": "R version 4.3.3 (2024-02-29)",
+  "platform": "x86_64-pc-linux-gnu"
+}

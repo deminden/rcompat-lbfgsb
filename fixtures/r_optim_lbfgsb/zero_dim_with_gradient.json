@@ -1,0 +1,28 @@
+{
+  "fixture": "zero_dim_with_gradient",
+  "initial_par": [],
+  "lower": [],
+  "upper": [],
+  "control": {
+    "maxit": 100,
+    "fnscale": 1,
+    "parscale": [],
+    "ndeps": [],
+    "factr": 10000000,
+    "pgtol": 0,
+    "lmm": 5
+  },
+  "gradient_supplied": true,
+  "result": {
+    "par": [],
+    "value": 123,
+    "counts": {
+      "function": 1,
+      "gradient": 0
+    },
+    "convergence": 0,
+    "message": "NOTHING TO DO"
+  },
+  "r_version": "R version 4.3.3 (2024-02-29)",
+  "platform": "x86_64-pc-linux-gnu"
+}

@@ -1,0 +1,22 @@
+[package]
+name = "rcompat-lbfgsb"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Clean-room Rust implementation of R-compatible stats::optim L-BFGS-B semantics"
+readme = "README.md"
+repository = "https://github.com/deminden/rcompat-lbfgsb"
+categories = ["algorithms", "science"]
+keywords = ["optimization", "lbfgsb", "r", "compatibility"]
+exclude = ["external/**", "data/**", "target/**", "Cargo.lock"]
+
+[dependencies]
+
+[dev-dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
