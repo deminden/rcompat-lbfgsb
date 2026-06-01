@@ -56,6 +56,12 @@ projected Armijo fallback keeps its separate smaller sufficient-decrease
 constant because it is used only for one-dimensional and finite-difference
 paths that already match their R fixtures.
 
+For bounded multi-dimensional supplied-gradient problems, the first constrained
+More-Thuente trial is capped at `stp = 1`, matching the L-BFGS-B 2.3 code path
+bundled with R. When that capped trial satisfies sufficient decrease and keeps
+descending, the native backend accepts it as a successful R-style `STPMAX`
+warning case instead of forcing another extrapolation.
+
 The More-Thuente main path uses a machine-epsilon-scale minimum step so
 finite-bound supplied-gradient problems can take R's final tiny cleanup step
 before `pgtol = 0` convergence. The Armijo fallback keeps the older, larger
@@ -84,10 +90,11 @@ For one-dimensional and finite-difference/no-gradient problems, the backend
 keeps the older projected direction plus Armijo interpolation path because that
 matches R's count and `maxit` edge behavior for those committed fixtures.
 
-L-BFGS history updates use a machine-epsilon-scale positive-curvature gate.
-This keeps the update acceptance policy aligned with the algorithmic tolerance
-scale while leaving separate, larger safeguards in the dense test-only subspace
-solve.
+L-BFGS history updates use the Algorithm 778 machine-epsilon-scale curvature
+skip test based on the previous directional derivative, with a norm-scaled
+positive-curvature fallback when that derivative is unavailable. This keeps the
+update acceptance policy aligned with the algorithmic tolerance scale while
+leaving separate, larger safeguards in the dense test-only subspace solve.
 
 Backend-specific types should not leak into the public API.
 
@@ -100,7 +107,9 @@ Optimization" (<https://doi.org/10.1137/0916069>) and by Zhu, Byrd, Lu, and
 Nocedal in "Algorithm 778: L-BFGS-B" (<https://doi.org/10.1145/279232.279236>).
 The production multi-dimensional supplied-gradient path follows the
 sufficient-decrease and curvature-condition strategy described by Moré and
-Thuente (<https://doi.org/10.1145/192115.192132>).
+Thuente (<https://doi.org/10.1145/192115.192132>). Its stage-one transition is
+keyed to a nonnegative trial directional derivative, while the Armijo-scaled
+derivative is used for the modified-function search test.
 
 Test-only strong-Wolfe bracketing/zoom coverage remains in place, including a
 bounded adapter that can expand beyond the unit trial up to the feasible cap,
@@ -124,9 +133,17 @@ noise.
 
 The DESeq-derived real-data subset is also an active production expectation for
 multi-dimensional supplied-gradient parity. Its compact 4-D negative-binomial
-GLM cases include actual optimizer-routed genes and force-optimizer probes, and
-match the generated R `optim` outputs on counts, convergence message, final
-value, and parameters within tight floating-point tolerances.
+GLM cases currently include seventeen actual optimizer-routed genes and fifty-one
+force-optimizer probes selected from a full ignored-data scan where 491 of 512
+DESeq rows matched the strict active contract. The committed cases match the
+generated R `optim` outputs on counts, convergence message, final value, and
+parameters within tight floating-point tolerances.
+
+Setting `DESEQ_PARITY_SCAN=1` keeps the same test running through every case and
+prints per-gene errors for ignored-data scans. `DESEQ_PARITY_SCAN_VERBOSE=1`
+adds actual and expected parameter vectors for failures, while
+`DESEQ_TRACE_GENE=<gene>` and `DESEQ_BACKEND_TRACE=<level>` expose paired R/Rust
+objective and backend traces for the remaining drift targets.
 
 These papers are algorithmic references, not source-code inputs.
 

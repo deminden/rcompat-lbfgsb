@@ -159,6 +159,12 @@ impl NativeBackend {
                 direction: &direction,
                 lower,
                 upper,
+                // R's bundled L-BFGS-B caps the first constrained line search at stp = 1.
+                max_step_cap: if iteration == 1 && has_finite_bound {
+                    Some(1.0)
+                } else {
+                    None
+                },
                 cap_initial_unbounded_step: history.is_empty()
                     && lower.iter().all(|value| value.is_infinite())
                     && upper.iter().all(|value| value.is_infinite()),
@@ -190,6 +196,7 @@ impl NativeBackend {
                 control.lmm,
                 difference(&step.x, &x),
                 difference(&step.gradient, &gradient),
+                &gradient,
             );
 
             used_multidimensional_interpolation |= step.used_multidimensional_interpolation;
@@ -359,6 +366,7 @@ struct LineSearchRequest<'a> {
     direction: &'a [f64],
     lower: &'a [f64],
     upper: &'a [f64],
+    max_step_cap: Option<f64>,
     cap_initial_unbounded_step: bool,
     initial_step_cap: Option<f64>,
     allow_quadratic_interpolation: bool,
@@ -468,7 +476,11 @@ fn line_search<P>(
 where
     P: BackendProblem,
 {
-    let max_alpha = max_feasible_step(request.x, request.direction, request.lower, request.upper);
+    let mut max_alpha =
+        max_feasible_step(request.x, request.direction, request.lower, request.upper);
+    if let Some(cap) = request.max_step_cap {
+        max_alpha = max_alpha.min(cap);
+    }
     let mut alpha = max_alpha.min(1.0);
     if request.cap_initial_unbounded_step {
         alpha = alpha.min(1.0 / norm_inf(request.direction).max(1.0));
@@ -588,7 +600,11 @@ fn more_thuente_line_search<P>(
 where
     P: BackendProblem,
 {
-    let max_alpha = max_feasible_step(request.x, request.direction, request.lower, request.upper);
+    let mut max_alpha =
+        max_feasible_step(request.x, request.direction, request.lower, request.upper);
+    if let Some(cap) = request.max_step_cap {
+        max_alpha = max_alpha.min(cap);
+    }
     let mut alpha = max_alpha.min(1.0);
     if request.cap_initial_unbounded_step {
         alpha = alpha.min(1.0 / norm_inf(request.direction).max(1.0));
@@ -661,7 +677,30 @@ where
 
         let sufficient_decrease =
             more_thuente_sufficient_decrease(request.value, decrease_test, alpha);
-        if stage_one && evaluation.value <= sufficient_decrease && derivative >= decrease_test {
+        if alpha == max_alpha
+            && evaluation.value <= sufficient_decrease
+            && derivative <= decrease_test
+        {
+            return Ok(Some(Step {
+                x: candidate,
+                value: evaluation.value,
+                gradient: evaluation.gradient,
+                line_search_trials: evaluated_candidates.saturating_sub(1),
+                alpha,
+                max_alpha,
+                step_norm: norm2(&step),
+                curvature_ratio,
+                wolfe_curvature_satisfied: false,
+                used_multidimensional_interpolation: false,
+            }));
+        }
+
+        if more_thuente_enters_stage_two(
+            stage_one,
+            evaluation.value,
+            sufficient_decrease,
+            derivative,
+        ) {
             stage_one = false;
         }
 
@@ -737,6 +776,15 @@ where
 
 fn more_thuente_sufficient_decrease(value_at_zero: f64, decrease_test: f64, alpha: f64) -> f64 {
     value_at_zero + alpha * decrease_test
+}
+
+fn more_thuente_enters_stage_two(
+    stage_one: bool,
+    value: f64,
+    sufficient_decrease: f64,
+    derivative: f64,
+) -> bool {
+    stage_one && value <= sufficient_decrease && derivative >= 0.0
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -890,9 +938,7 @@ fn more_thuente_cubic_case_two(best: MoreThuentePoint, trial: MoreThuentePoint) 
         trial.derivative,
         delta,
     )?;
-    if trial.alpha > best.alpha {
-        gamma = -gamma;
-    }
+    gamma = -gamma;
     let p = (gamma - trial.derivative) + more_thuente_theta(best, trial, delta);
     let q = ((gamma - trial.derivative) + gamma) + best.derivative;
     finite_ratio(p, q).map(|ratio| trial.alpha + ratio * (best.alpha - trial.alpha))
@@ -907,9 +953,7 @@ fn more_thuente_cubic_case_three(best: MoreThuentePoint, trial: MoreThuentePoint
         trial.derivative,
         delta,
     )?;
-    if trial.alpha > best.alpha {
-        gamma = -gamma;
-    }
+    gamma = -gamma;
     let p = (gamma - trial.derivative) + more_thuente_theta(best, trial, delta);
     let q = (gamma + (best.derivative - trial.derivative)) + gamma;
     finite_ratio(p, q)
@@ -926,9 +970,7 @@ fn more_thuente_cubic_case_four(other: MoreThuentePoint, trial: MoreThuentePoint
         trial.derivative,
         delta,
     )?;
-    if trial.alpha > other.alpha {
-        gamma = -gamma;
-    }
+    gamma = -gamma;
     let p = (gamma - trial.derivative) + more_thuente_theta(other, trial, delta);
     let q = ((gamma - trial.derivative) + gamma) + other.derivative;
     finite_ratio(p, q).map(|ratio| trial.alpha + ratio * (other.alpha - trial.alpha))
@@ -1603,6 +1645,7 @@ where
 
     let mut previous_time = 0.0;
     let mut cursor = 0;
+    let mut curvature_floor = 0.0;
 
     loop {
         let direction = cauchy_path_direction(gradient, &free);
@@ -1617,6 +1660,9 @@ where
         let displacement = difference(&point, x);
         let derivative = dot(gradient, &direction) + dot(&displacement, &hessian_direction);
         let curvature = dot(&direction, &hessian_direction);
+        if cursor == 0 && curvature > 0.0 && curvature.is_finite() {
+            curvature_floor = f64::EPSILON * curvature;
+        }
 
         if derivative >= 0.0 {
             return CauchyPoint {
@@ -1632,7 +1678,7 @@ where
         let interval = next_time - previous_time;
 
         if curvature > 0.0 && curvature.is_finite() {
-            let stationary_interval = -derivative / curvature;
+            let stationary_interval = -derivative / curvature.max(curvature_floor);
             if stationary_interval <= interval {
                 advance_cauchy_point(&mut point, &direction, stationary_interval, lower, upper);
                 return CauchyPoint {
@@ -1854,11 +1900,23 @@ fn projected_gradient_norm(x: &[f64], gradient: &[f64], lower: &[f64], upper: &[
     max_norm
 }
 
-fn update_history(history: &mut Vec<Correction>, limit: usize, s: Vec<f64>, y: Vec<f64>) {
+fn update_history(
+    history: &mut Vec<Correction>,
+    limit: usize,
+    s: Vec<f64>,
+    y: Vec<f64>,
+    previous_gradient: &[f64],
+) {
     let sy = dot(&s, &y);
-    let ss = dot(&s, &s);
-    let yy = dot(&y, &y);
-    if sy <= HISTORY_CURVATURE_EPS * ss.sqrt() * yy.sqrt() || sy <= 0.0 {
+    let directional_derivative = dot(previous_gradient, &s);
+    let threshold = if directional_derivative < 0.0 && directional_derivative.is_finite() {
+        HISTORY_CURVATURE_EPS * -directional_derivative
+    } else {
+        let ss = dot(&s, &s);
+        let yy = dot(&y, &y);
+        HISTORY_CURVATURE_EPS * ss.sqrt() * yy.sqrt()
+    };
+    if sy <= threshold || sy <= 0.0 {
         return;
     }
     if history.len() == limit {
@@ -1991,6 +2049,15 @@ mod tests {
         first_points: Vec<Vec<f64>>,
     }
 
+    fn assert_mirrored_steps(right: Option<f64>, left: Option<f64>) {
+        let right = right.expect("right-hand step");
+        let left = left.expect("left-hand mirrored step");
+        assert!(
+            (right + left).abs() <= 1e-14,
+            "right={right:?}, left={left:?}"
+        );
+    }
+
     #[test]
     fn project_direction_keeps_free_quasi_newton_components() {
         let mut direction = vec![1.0, -2.0];
@@ -2019,9 +2086,116 @@ mod tests {
     fn history_update_accepts_machine_epsilon_scale_positive_curvature() {
         let mut history = Vec::new();
 
-        update_history(&mut history, 5, vec![1.0, 0.0], vec![1e-13, 1.0]);
+        update_history(
+            &mut history,
+            5,
+            vec![1.0, 0.0],
+            vec![1e-13, 1.0],
+            &[-1.0, 0.0],
+        );
 
         assert_eq!(history.len(), 1);
+    }
+
+    #[test]
+    fn history_update_uses_directional_algorithm_778_skip_threshold() {
+        let mut history = Vec::new();
+
+        update_history(
+            &mut history,
+            5,
+            vec![1.0, 0.0],
+            vec![1e-18, 0.0],
+            &[-1.0, 0.0],
+        );
+
+        assert!(history.is_empty());
+    }
+
+    #[test]
+    fn more_thuente_stage_two_waits_for_nonnegative_directional_derivative() {
+        assert!(!more_thuente_enters_stage_two(true, 0.0, 0.0, -1e-12));
+        assert!(more_thuente_enters_stage_two(true, 0.0, 0.0, 0.0));
+        assert!(!more_thuente_enters_stage_two(false, 0.0, 0.0, 1.0));
+    }
+
+    #[test]
+    fn more_thuente_cubic_steps_are_mirror_symmetric() {
+        let right_best = MoreThuentePoint {
+            alpha: 0.0,
+            value: 0.0,
+            derivative: -1.0,
+        };
+        let left_best = MoreThuentePoint {
+            alpha: 0.0,
+            value: 0.0,
+            derivative: 1.0,
+        };
+
+        assert_mirrored_steps(
+            more_thuente_cubic_case_two(
+                right_best,
+                MoreThuentePoint {
+                    alpha: 1.0,
+                    value: -0.25,
+                    derivative: 0.2,
+                },
+            ),
+            more_thuente_cubic_case_two(
+                left_best,
+                MoreThuentePoint {
+                    alpha: -1.0,
+                    value: -0.25,
+                    derivative: -0.2,
+                },
+            ),
+        );
+
+        assert_mirrored_steps(
+            more_thuente_cubic_case_three(
+                right_best,
+                MoreThuentePoint {
+                    alpha: 1.0,
+                    value: -0.5,
+                    derivative: -0.1,
+                },
+            ),
+            more_thuente_cubic_case_three(
+                left_best,
+                MoreThuentePoint {
+                    alpha: -1.0,
+                    value: -0.5,
+                    derivative: 0.1,
+                },
+            ),
+        );
+
+        assert_mirrored_steps(
+            more_thuente_cubic_case_four(
+                MoreThuentePoint {
+                    alpha: 2.0,
+                    value: 0.5,
+                    derivative: 0.7,
+                },
+                MoreThuentePoint {
+                    alpha: 1.0,
+                    value: -0.25,
+                    derivative: -1.2,
+                },
+            ),
+            more_thuente_cubic_case_four(
+                MoreThuentePoint {
+                    alpha: -2.0,
+                    value: 0.5,
+                    derivative: -0.7,
+                },
+                MoreThuentePoint {
+                    alpha: -1.0,
+                    value: -0.25,
+                    derivative: 1.2,
+                },
+            ),
+        );
     }
 
     #[test]
@@ -2254,6 +2428,7 @@ mod tests {
                 direction: &[1.0],
                 lower: &[f64::NEG_INFINITY],
                 upper: &[f64::INFINITY],
+                max_step_cap: None,
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
@@ -2289,6 +2464,7 @@ mod tests {
                 direction: &[10.0],
                 lower: &[f64::NEG_INFINITY],
                 upper: &[f64::INFINITY],
+                max_step_cap: None,
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: true,
@@ -2323,6 +2499,7 @@ mod tests {
                 direction: &[0.1],
                 lower: &[f64::NEG_INFINITY],
                 upper: &[f64::INFINITY],
+                max_step_cap: None,
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
@@ -2344,6 +2521,39 @@ mod tests {
     }
 
     #[test]
+    fn more_thuente_accepts_r_max_step_warning_case() {
+        let mut problem = LinearDescent;
+        let mut counts = OptimCounts::default();
+        let step = more_thuente_line_search(
+            &mut problem,
+            LineSearchRequest {
+                x: &[0.0],
+                value: 0.0,
+                gradient: &[-1.0],
+                direction: &[1.0],
+                lower: &[f64::NEG_INFINITY],
+                upper: &[10.0],
+                max_step_cap: Some(1.0),
+                cap_initial_unbounded_step: false,
+                initial_step_cap: None,
+                allow_quadratic_interpolation: false,
+                min_step: MAIN_PATH_MIN_STEP,
+                quadratic_interpolation_damping: INTERPOLATION_DAMPING,
+            },
+            &mut counts,
+        )
+        .expect("More-Thuente should not error")
+        .expect("R accepts STPMAX warning as a new iterate");
+
+        assert_eq!(counts.function, 1);
+        assert_eq!(counts.gradient, 1);
+        assert_eq!(step.alpha, 1.0);
+        assert_eq!(step.max_alpha, 1.0);
+        assert!(!step.wolfe_curvature_satisfied);
+        assert_vec_close(&step.x, &[1.0], 1e-15);
+    }
+
+    #[test]
     fn strong_wolfe_line_search_expands_beyond_unit_alpha_when_direction_is_short() {
         let mut problem = OneDimensionalQuadratic;
         let mut counts = OptimCounts::default();
@@ -2356,6 +2566,7 @@ mod tests {
                 direction: &[0.1],
                 lower: &[f64::NEG_INFINITY],
                 upper: &[1.0],
+                max_step_cap: None,
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
@@ -2389,6 +2600,7 @@ mod tests {
                 direction: &[10.0],
                 lower: &[f64::NEG_INFINITY],
                 upper: &[10.0],
+                max_step_cap: None,
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
@@ -2421,6 +2633,7 @@ mod tests {
                 direction: &[1.0],
                 lower: &[f64::NEG_INFINITY],
                 upper: &[0.1],
+                max_step_cap: None,
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
@@ -2455,6 +2668,7 @@ mod tests {
                 direction: &[1.0],
                 lower: &[f64::NEG_INFINITY],
                 upper: &[f64::INFINITY],
+                max_step_cap: None,
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
@@ -2890,9 +3104,27 @@ mod tests {
         let g3 = problem.gradient(&x3).expect("Rosenbrock gradient");
         let mut history = Vec::new();
 
-        update_history(&mut history, 5, difference(&x1, &x0), difference(&g1, &g0));
-        update_history(&mut history, 5, difference(&x2, &x1), difference(&g2, &g1));
-        update_history(&mut history, 5, difference(&x3, &x2), difference(&g3, &g2));
+        update_history(
+            &mut history,
+            5,
+            difference(&x1, &x0),
+            difference(&g1, &g0),
+            &g0,
+        );
+        update_history(
+            &mut history,
+            5,
+            difference(&x2, &x1),
+            difference(&g2, &g1),
+            &g1,
+        );
+        update_history(
+            &mut history,
+            5,
+            difference(&x3, &x2),
+            difference(&g3, &g2),
+            &g2,
+        );
 
         let direction =
             cauchy_subspace_direction(&x3, &g3, &lower, &upper, &history, MAIN_PATH_MIN_STEP)
@@ -2909,6 +3141,7 @@ mod tests {
                 direction: &direction,
                 lower: &lower,
                 upper: &upper,
+                max_step_cap: None,
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
@@ -2968,6 +3201,7 @@ mod tests {
                 direction: &direction,
                 lower: &lower,
                 upper: &upper,
+                max_step_cap: None,
                 cap_initial_unbounded_step: false,
                 initial_step_cap: initial_step_cap_for_modes(modes, history.is_empty()),
                 allow_quadratic_interpolation: true,
@@ -3027,6 +3261,7 @@ mod tests {
                 direction: &direction,
                 lower: &lower,
                 upper: &upper,
+                max_step_cap: None,
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
@@ -3222,6 +3457,18 @@ mod tests {
 
         fn gradient(&mut self, x: &[f64]) -> Result<Vec<f64>, OptimError> {
             Ok(vec![2.0 * (x[0] - 2.0)])
+        }
+    }
+
+    struct LinearDescent;
+
+    impl BackendProblem for LinearDescent {
+        fn value(&mut self, x: &[f64]) -> Result<f64, OptimError> {
+            Ok(-x[0])
+        }
+
+        fn gradient(&mut self, _x: &[f64]) -> Result<Vec<f64>, OptimError> {
+            Ok(vec![-1.0])
         }
     }
 

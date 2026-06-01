@@ -158,6 +158,16 @@ write_fixture(
 )
 
 write_fixture(
+  "first_constrained_linear_2d",
+  initial_par = c(0.0, 0.0),
+  lower = c(-100.0, -100.0),
+  upper = c(100.0, 100.0),
+  control = list(),
+  fn = function(p) -p[[1]] - 0.5 * p[[2]],
+  gr = function(p) c(-1.0, -0.5)
+)
+
+write_fixture(
   "zero_dim",
   initial_par = numeric(0),
   lower = numeric(0),
@@ -722,11 +732,70 @@ write_deseq_real_subset <- function() {
     "IGKV1-27",
     "LINC02172",
     "CYP11B1",
+    "ENSG00000203565",
+    "ENSG00000257634",
+    "FAM230C",
+    "LINC02470",
     "LINC00370",
+    "ENSG00000243225",
+    "IGHV3-48",
+    "TBC1D3D",
+    "IGLV5-45",
+    "IGLV1-36",
+    "IGLV3-27",
+    "IGLV3-9",
+    "ENSG00000225840",
     "PPIAP86",
     "ENSG00000249901",
     "ENSG00000301330",
-    "ENSG00000305966"
+    "ENSG00000305966",
+    "MPTX1",
+    "ENSG00000296152",
+    "ENSG00000306013",
+    "ACTR3BP4",
+    "ENSG00000299968",
+    "NECAP1P1",
+    "CDCA7P2",
+    "ENSG00000287897",
+    "ENSG00000286197",
+    "RPL9P6",
+    "ENSG00000307324",
+    "ENSG00000289561",
+    "CTBP2P9",
+    "SCARNA23",
+    "ENSG00000259983",
+    "LINC01360",
+    "ENSG00000280340",
+    "ENSG00000298016",
+    "ENSG00000303225",
+    "CDC42P7",
+    "ENSG00000302934",
+    "ENSG00000294615",
+    "ENSG00000293361",
+    "ENSG00000218766",
+    "ENSG00000305895",
+    "ENSG00000298560",
+    "ENSG00000294405",
+    "ENSG00000255317",
+    "LINC00348",
+    "ENSG00000298943",
+    "ENSG00000307354",
+    "RPS26P59",
+    "ENSG00000293825",
+    "LINC02503",
+    "HCFC2P1",
+    "COX8CP1",
+    "ENSG00000303010",
+    "SSX13P",
+    "ENSG00000235679",
+    "ENSG00000301424",
+    "ENSG00000310316",
+    "LINC01493",
+    "RNU1-33P",
+    "ENSG00000299883",
+    "ENSG00000303257",
+    "DKKL1P1",
+    "ENSG00000305324"
   )
 
   read_tsv <- function(name) {
@@ -750,10 +819,18 @@ write_deseq_real_subset <- function() {
   size_factors <- read_tsv("size_factors.tsv")
   sample_metadata <- read_tsv("sample_metadata.tsv")
 
+  requested_genes <- Sys.getenv("DESEQ_FIXTURE_GENES", unset = "")
+  if (identical(requested_genes, "all")) {
+    genes <- gene_cases$gene
+  } else if (nzchar(requested_genes)) {
+    genes <- strsplit(requested_genes, ",", fixed = TRUE)[[1]]
+    genes <- trimws(genes)
+  }
   genes <- genes[genes %in% gene_cases$gene]
   if (length(genes) == 0) {
     stop("no DESeq-derived fixture genes were found in data/selected_gene_cases.tsv")
   }
+  trace_gene <- Sys.getenv("DESEQ_TRACE_GENE", unset = "")
 
   write_tsv(gene_cases[gene_cases$gene %in% genes, ], "gene_cases.tsv")
   write_tsv(counts[counts$gene %in% genes, ], "counts.tsv")
@@ -811,10 +888,24 @@ write_deseq_real_subset <- function() {
     initial_par <- as.numeric(gene_coefficients$betaNoOptim)
     lower <- rep(-30.0, dimension)
     upper <- rep(30.0, dimension)
+    trace_call <- 0L
+    fixture_fn <- nb_nll_without_constants
+    if (identical(gene, trace_gene)) {
+      fixture_fn <- function(beta, y, dispersion) {
+        trace_call <<- trace_call + 1L
+        cat(
+          "DESEQ_TRACE", gene, trace_call,
+          paste(formatC(beta, digits = 17, format = "e"), collapse = "\t"),
+          sep = "\t"
+        )
+        cat("\n")
+        nb_nll_without_constants(beta, y, dispersion)
+      }
+    }
 
     result <- optim(
       par = initial_par,
-      fn = nb_nll_without_constants,
+      fn = fixture_fn,
       gr = nb_nll_gradient,
       method = "L-BFGS-B",
       lower = lower,

@@ -143,3 +143,26 @@
   fixtures to guard the same no-gradient fallback path.
 - Added an active no-gradient finite-difference fixture for initial
   projected-gradient convergence under positive `pgtol`.
+- Expanded the committed DESeq-derived real-data subset from nine to sixty-eight
+  active parity cases; the full ignored-data scan now finds 491 of 512 selected
+  DESeq rows preserving exact count and `1e-8` final-value/parameter parity,
+  and the generator supports opt-in `DESEQ_FIXTURE_GENES=all` scans.
+- Aligned the L-BFGS history-update skip threshold with Algorithm 778's
+  directional-derivative machine-epsilon criterion, retaining a norm-scaled
+  fallback for non-descent diagnostic paths.
+- Corrected the More-Thuente stage-one transition to use the trial directional
+  derivative crossing zero, and added an opt-in `DESEQ_PARITY_SCAN=1` test mode
+  for full ignored-data parity scans.
+- Matched R's bundled L-BFGS-B 2.3 first constrained line-search cap (`stp = 1`)
+  and accepted the corresponding sufficient-decrease `STPMAX` warning shape as
+  a successful step, improving the full ignored DESeq scan from 487/512 to
+  490/512 strict passes without losing any previously passing row.
+- Promoted `LINC02470`, `DKKL1P1`, and `ENSG00000305324` into the active DESeq
+  subset, and added verbose DESeq trace controls for inspecting the remaining
+  drift targets.
+- Added an R-generated synthetic `first_constrained_linear_2d` fixture that
+  exercises the same first constrained `STPMAX` acceptance path without relying
+  on real DESeq data.
+- Corrected the mirrored More-Thuente cubic-step gamma sign for left-of-best
+  trial steps, improving the full ignored DESeq scan to 491/512 strict passes,
+  promoting `IGLV3-27`, and reducing `FGG` from a count split to exact R counts.

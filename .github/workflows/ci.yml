@@ -46,6 +46,12 @@ jobs:
     needs: rust
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: read
+      deployments: write
+    environment:
+      name: crates.io
+      url: https://crates.io/crates/rcompat-lbfgsb
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

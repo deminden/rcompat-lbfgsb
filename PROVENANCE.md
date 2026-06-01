@@ -32,6 +32,12 @@ The repository at <https://github.com/jonathanschilling/L-BFGS-B> may be useful
 for inspection because it collects L-BFGS-B source history, but code from it
 must not be copied directly into this crate.
 
+R source snapshots or tarballs may also be kept under `external/` for
+inspection-only behavior archaeology. Any compatibility change informed by such
+inspection must still be validated through public behavior, generated R traces,
+or parity fixtures, and no R source text may be copied, translated, or
+paraphrased into the Rust implementation.
+
 ## Accepted implementation inputs
 
 - Public R documentation for `optim` and its controls.

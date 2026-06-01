@@ -130,19 +130,61 @@ fn deseq_real_gradient_optim_cases_match_r() {
     let tables = deseq_tables();
     let design = design_matrix(&tables.design);
     let size_factors = size_factors(&tables.size_factors);
+    let scan_only = std::env::var_os("DESEQ_PARITY_SCAN").is_some();
+    let scan_verbose = std::env::var_os("DESEQ_PARITY_SCAN_VERBOSE").is_some();
+    let trace_gene = std::env::var("DESEQ_TRACE_GENE").ok();
 
     for case in &fixture.cases {
         let counts = counts_for_gene(&tables.counts, &case.gene);
+        let should_trace = trace_gene.as_deref() == Some(case.gene.as_str());
+        let mut trace_call = 0_usize;
         let result = optim_lbfgsb_with_gradient(
             case.initial_par.clone(),
             Bounds::new(case.lower.clone(), case.upper.clone()).unwrap(),
-            |beta| nb_nll_without_constants(beta, &counts, &design, &size_factors, case.dispersion),
+            |beta| {
+                if should_trace {
+                    trace_call += 1;
+                    println!(
+                        "DESEQ_TRACE\t{}\t{}\t{}",
+                        case.gene,
+                        trace_call,
+                        beta.iter()
+                            .map(|value| format!("{value:.17e}"))
+                            .collect::<Vec<_>>()
+                            .join("\t")
+                    );
+                }
+                nb_nll_without_constants(beta, &counts, &design, &size_factors, case.dispersion)
+            },
             |beta| nb_nll_gradient(beta, &counts, &design, &size_factors, case.dispersion),
             control_from_case(&case.control),
         )
         .unwrap();
 
-        assert_result_close(case, &result, 1e-8, 1e-8);
+        if scan_only {
+            let scan = scan_result(case, &result, 1e-8, 1e-8);
+            println!(
+                "DESEQ_SCAN\t{}\t{}\tpar_err={:.17e}\tvalue_err={:.17e}\tcount_delta={}\tactual_counts={}/{}\texpected_counts={}/{}",
+                case.gene,
+                scan.passed,
+                scan.par_error,
+                scan.value_error,
+                scan.count_delta,
+                result.counts.function,
+                result.counts.gradient,
+                case.result.counts.function,
+                case.result.counts.gradient
+            );
+            if scan_verbose && !scan.passed {
+                println!("DESEQ_SCAN_ACTUAL_PAR\t{}\t{:?}", case.gene, result.par);
+                println!(
+                    "DESEQ_SCAN_EXPECTED_PAR\t{}\t{:?}",
+                    case.gene, case.result.par
+                );
+            }
+        } else {
+            assert_result_close(case, &result, 1e-8, 1e-8);
+        }
     }
 }
 
@@ -282,6 +324,10 @@ fn row_dot(row: &[f64], beta: &[f64]) -> f64 {
 }
 
 fn control_from_case(control: &DeseqControl) -> OptimControl {
+    let trace = std::env::var("DESEQ_BACKEND_TRACE")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(0);
     OptimControl {
         maxit: control.maxit,
         fnscale: control.fnscale,
@@ -290,8 +336,8 @@ fn control_from_case(control: &DeseqControl) -> OptimControl {
         factr: control.factr,
         pgtol: control.pgtol,
         lmm: control.lmm,
-        trace: 0,
-        report: 10,
+        trace,
+        report: 1,
     }
 }
 
@@ -331,6 +377,44 @@ fn assert_result_close(
         &case.fixture,
         "value",
     );
+}
+
+#[derive(Debug)]
+struct ScanResult {
+    passed: bool,
+    par_error: f64,
+    value_error: f64,
+    count_delta: usize,
+}
+
+fn scan_result(
+    case: &DeseqCase,
+    result: &OptimResult,
+    par_tolerance: f64,
+    value_tolerance: f64,
+) -> ScanResult {
+    let par_error = result
+        .par
+        .iter()
+        .zip(case.result.par.iter())
+        .map(|(actual, expected)| (actual - expected).abs())
+        .fold(0.0, f64::max);
+    let value_error = (result.value - case.result.value).abs();
+    let function_delta = result.counts.function.abs_diff(case.result.counts.function);
+    let gradient_delta = result.counts.gradient.abs_diff(case.result.counts.gradient);
+    let passed = result.convergence == case.result.convergence
+        && result.message == case.result.message
+        && result.counts.function == case.result.counts.function
+        && result.counts.gradient == case.result.counts.gradient
+        && par_error <= par_tolerance
+        && value_error <= value_tolerance;
+
+    ScanResult {
+        passed,
+        par_error,
+        value_error,
+        count_delta: function_delta + gradient_delta,
+    }
 }
 
 fn assert_close(actual: f64, expected: f64, tolerance: f64, fixture: &str, field: &str) {

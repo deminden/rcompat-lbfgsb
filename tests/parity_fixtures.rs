@@ -75,6 +75,7 @@ fn fixtures_that_are_currently_at_float_noise_match_r() {
         include_str!("../fixtures/r_optim_lbfgsb/factr_zero_2d_quadratic.json"),
         include_str!("../fixtures/r_optim_lbfgsb/factr_zero_quadratic.json"),
         include_str!("../fixtures/r_optim_lbfgsb/factr_loose_2d_quadratic.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/first_constrained_linear_2d.json"),
         include_str!("../fixtures/r_optim_lbfgsb/fixed_free_2d.json"),
         include_str!("../fixtures/r_optim_lbfgsb/fixed_parameter.json"),
         include_str!("../fixtures/r_optim_lbfgsb/finite_difference.json"),
@@ -423,6 +424,14 @@ fn run_fixture(fixture: &Fixture) -> OptimResult {
             bounds,
             |p| (p[0] - 1.0).powi(2) + (p[1] + 2.0).powi(2),
             |p| vec![2.0 * (p[0] - 1.0), 2.0 * (p[1] + 2.0)],
+            control,
+        )
+        .unwrap(),
+        "first_constrained_linear_2d" => optim_lbfgsb_with_gradient(
+            fixture.initial_par.clone(),
+            bounds,
+            |p| -p[0] - 0.5 * p[1],
+            |_| vec![-1.0, -0.5],
             control,
         )
         .unwrap(),
