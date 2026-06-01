@@ -1,0 +1,28 @@
+{
+  "fixture": "pgtol_finite_difference_2d",
+  "initial_par": [4, -5],
+  "lower": [-10, -10],
+  "upper": [10, 10],
+  "control": {
+    "maxit": 100,
+    "fnscale": 1,
+    "parscale": [1, 1],
+    "ndeps": [0.0001, 0.00020000000000000001],
+    "factr": 10000000,
+    "pgtol": 0.25,
+    "lmm": 5
+  },
+  "gradient_supplied": false,
+  "result": {
+    "par": [1.0000000000020552, -2.0000000000020552],
+    "value": 8.4480628953056179e-24,
+    "counts": {
+      "function": 3,
+      "gradient": 3
+    },
+    "convergence": 0,
+    "message": "CONVERGENCE: NORM OF PROJECTED GRADIENT <= PGTOL"
+  },
+  "r_version": "R version 4.3.3 (2024-02-29)",
+  "platform": "x86_64-pc-linux-gnu"
+}

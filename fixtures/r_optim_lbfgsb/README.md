@@ -11,7 +11,13 @@ upper bounds, fixed parameters with supplied gradients, initial projected
 gradient convergence, infinite bounds, mixed finite/infinite bounds,
 projected out-of-range and infinite starting values, zero-dimensional no-op
 optimization, `fnscale`, `parscale`, `ndeps`, asymmetric finite-difference
-stencils near bounds, `factr = 0`, `maxit`, and a Rosenbrock evaluation trace
-prefix for active main-path backend parity work.
+stencils near bounds, `factr = 0`, `pgtol`, `maxit`, multi-dimensional
+quadratics, fixed coordinates in multi-dimensional supplied-gradient problems,
+active box constraints, all-unbounded supplied-gradient problems, mixed-bound
+and half/all-unbounded finite differences, scaled bounds, combined `fnscale`/`parscale`
+supplied-gradient and finite-difference scaling, positive finite-difference
+`pgtol` at both initial and post-step convergence, finite-difference `maxit`
+controls, `lmm` variants, and a Rosenbrock
+evaluation trace prefix for active main-path backend parity work.
 
 Real-data DESeq-derived fixture subsets live in `fixtures/deseq_real_subset/`.

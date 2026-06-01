@@ -1,0 +1,28 @@
+{
+  "fixture": "lmm_two_rosenbrock",
+  "initial_par": [-1.2, 1],
+  "lower": [-5, -5],
+  "upper": [5, 5],
+  "control": {
+    "maxit": 100,
+    "fnscale": 1,
+    "parscale": [1, 1],
+    "ndeps": [0.001, 0.001],
+    "factr": 10000000,
+    "pgtol": 0,
+    "lmm": 2
+  },
+  "gradient_supplied": true,
+  "result": {
+    "par": [1.0000008345301152, 1.0000017564532546],
+    "value": 1.4601824093931578e-12,
+    "counts": {
+      "function": 53,
+      "gradient": 53
+    },
+    "convergence": 0,
+    "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+  },
+  "r_version": "R version 4.3.3 (2024-02-29)",
+  "platform": "x86_64-pc-linux-gnu"
+}

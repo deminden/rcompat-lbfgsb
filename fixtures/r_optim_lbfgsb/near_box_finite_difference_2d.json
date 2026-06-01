@@ -1,0 +1,28 @@
+{
+  "fixture": "near_box_finite_difference_2d",
+  "initial_par": [0.99995000000000001, -0.99995000000000001],
+  "lower": [-1, -1],
+  "upper": [1, 1],
+  "control": {
+    "maxit": 100,
+    "fnscale": 1,
+    "parscale": [1, 1],
+    "ndeps": [0.0001, 0.00020000000000000001],
+    "factr": 10000000,
+    "pgtol": 0,
+    "lmm": 5
+  },
+  "gradient_supplied": false,
+  "result": {
+    "par": [0.24999999999997244, -0.24999999999996328],
+    "value": 3.4564333451967287e-27,
+    "counts": {
+      "function": 6,
+      "gradient": 6
+    },
+    "convergence": 0,
+    "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+  },
+  "r_version": "R version 4.3.3 (2024-02-29)",
+  "platform": "x86_64-pc-linux-gnu"
+}

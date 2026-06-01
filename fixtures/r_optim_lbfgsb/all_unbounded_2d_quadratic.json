@@ -1,0 +1,28 @@
+{
+  "fixture": "all_unbounded_2d_quadratic",
+  "initial_par": [4, -5],
+  "lower": ["-Inf", "-Inf"],
+  "upper": ["Inf", "Inf"],
+  "control": {
+    "maxit": 100,
+    "fnscale": 1,
+    "parscale": [1, 1],
+    "ndeps": [0.001, 0.001],
+    "factr": 10000000,
+    "pgtol": 0,
+    "lmm": 5
+  },
+  "gradient_supplied": true,
+  "result": {
+    "par": [1.0000000050393685, -1.9999999991645208],
+    "value": 2.6791285783162719e-17,
+    "counts": {
+      "function": 7,
+      "gradient": 7
+    },
+    "convergence": 0,
+    "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+  },
+  "r_version": "R version 4.3.3 (2024-02-29)",
+  "platform": "x86_64-pc-linux-gnu"
+}

@@ -97,3 +97,49 @@
   bracketed cubic/quadratic/secant step-state updates, preserving the
   Rosenbrock trace guardrail and promoting the DESeq-derived real-data parity
   target to an active `cargo test` case at `1e-8` tolerances.
+- Matched the production More-Thuente sufficient-decrease tolerance to the
+  R/L-BFGS-B `1e-3` behavior, fixing a multi-dimensional `pgtol` stop after
+  line search without regressing Rosenbrock or DESeq parity.
+- Added R-generated parity fixtures for 3-D supplied-gradient quadratics,
+  active 3-D box constraints, 2-D `pgtol` convergence after an optimizer step,
+  and 2-D finite-difference optimization with both `parscale` and vector
+  `ndeps`.
+- Added active supplied-gradient parity fixtures for multi-dimensional fixed
+  coordinates, covering both fixed+free and all-fixed parameter vectors.
+- Split the minimum-step floor by backend path: the More-Thuente
+  supplied-gradient path now accepts R's final machine-epsilon-scale cleanup
+  step, while the Armijo finite-difference fallback keeps its existing count
+  behavior.
+- Added active R-generated fixtures for all-unbounded 2-D supplied-gradient
+  optimization, 2-D `factr = 0`, supplied-gradient initial projected-gradient
+  convergence, and combined `fnscale`/`parscale` supplied-gradient scaling.
+- Matched a mixed finite/infinite no-gradient finite-difference case where R
+  reports projected-gradient convergence despite tiny stencil noise at the
+  final point, without changing finite-bound finite-difference termination.
+- Added active fixtures for 2-D mixed-bound finite differences, finite
+  differences near both sides of a box, scaled bounds with supplied gradients,
+  2-D `maxit = 1`, and `lmm = 2` Rosenbrock parity.
+- Avoided an extra final optimizer-level evaluation for no-gradient
+  finite-difference paths after multidimensional interpolation, matching R's
+  count for combined `fnscale`/`parscale` finite-difference optimization.
+- Added an active combined `fnscale`/`parscale` finite-difference fixture, and
+  recorded a scaled active-bound cleanup-count drift in ignored exploration
+  notes rather than promoting it before a principled rounding-path fix exists.
+- Matched positive-`pgtol` multi-dimensional finite-difference interpolation by
+  using an undamped quadratic trial only for that fallback path, preserving the
+  damped exact-zero `pgtol` and one-dimensional fixtures.
+- Added active fixtures for 2-D `maxit = 0`, loose-`factr` 2-D quadratics,
+  positive-`pgtol` finite differences, and `lmm = 10` Rosenbrock parity.
+- Matched 2-D no-gradient `maxit = 0` finite-difference parity by using R's
+  undamped first quadratic interpolation for that terminal Armijo fallback path,
+  and added the adjacent `maxit = 1` finite-difference fixture as a guardrail.
+- Expanded the committed DESeq-derived real-data subset with three more actual
+  optimizer-routed genes that preserve the active `1e-8` R parity contract, and
+  recorded nearby count-drift probes in ignored exploration notes.
+- Added an active all-unbounded 2-D finite-difference fixture for the
+  no-gradient Armijo fallback path, and narrowed the finite-difference
+  infinite-bound projected-gradient noise floor to mixed finite/infinite boxes.
+- Added active lower-only and upper-only half-infinite 2-D finite-difference
+  fixtures to guard the same no-gradient fallback path.
+- Added an active no-gradient finite-difference fixture for initial
+  projected-gradient convergence under positive `pgtol`.

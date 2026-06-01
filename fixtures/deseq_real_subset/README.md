@@ -14,5 +14,6 @@ the committed design matrix, size factors, and selected count rows. The
 objective omits beta-independent constants so normal Rust tests do not need an
 R or DESeq runtime.
 
-The Rust test suite treats these cases as active parity checks for the
-multi-dimensional supplied-gradient path.
+The Rust test suite treats these nine cases as active parity checks for the
+multi-dimensional supplied-gradient path, covering both actual optimizer-routed
+genes and force-optimizer probes.

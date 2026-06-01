@@ -68,6 +68,93 @@
       }
     },
     {
+      "fixture": "deseq_nb_linc02172",
+      "gene": "LINC02172",
+      "reason": "actual_or_rough_optimizer_row",
+      "dispersion": 15.9436093970202,
+      "initial_par": [-8.7999990451974792, 57.1997977106777, 13.0953477183697, 23.620141143676101],
+      "lower": [-30, -30, -30, -30],
+      "upper": [30, 30, 30, 30],
+      "control": {
+        "maxit": 100,
+        "fnscale": 1,
+        "parscale": [1, 1, 1, 1],
+        "ndeps": [0.001, 0.001, 0.001, 0.001],
+        "factr": 10000000,
+        "pgtol": 0,
+        "lmm": 5
+      },
+      "gradient_supplied": true,
+      "result": {
+        "par": [0.54853456145300183, 2.4920280227555263, 1.2234499519678073, -0.18148194908318396],
+        "value": 28.175659374289655,
+        "counts": {
+          "function": 44,
+          "gradient": 44
+        },
+        "convergence": 0,
+        "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+      }
+    },
+    {
+      "fixture": "deseq_nb_cyp11b1",
+      "gene": "CYP11B1",
+      "reason": "actual_or_rough_optimizer_row",
+      "dispersion": 3.5002399319196398,
+      "initial_par": [-14.594144297247, 60.870235466396501, 2.2356903960132102, 40.5452052677933],
+      "lower": [-30, -30, -30, -30],
+      "upper": [30, 30, 30, 30],
+      "control": {
+        "maxit": 100,
+        "fnscale": 1,
+        "parscale": [1, 1, 1, 1],
+        "ndeps": [0.001, 0.001, 0.001, 0.001],
+        "factr": 10000000,
+        "pgtol": 0,
+        "lmm": 5
+      },
+      "gradient_supplied": true,
+      "result": {
+        "par": [2.8864962450232934, 2.0761910702235045, 1.0730401498457136, 0.85186623619141488],
+        "value": 152.98972657530516,
+        "counts": {
+          "function": 49,
+          "gradient": 49
+        },
+        "convergence": 0,
+        "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+      }
+    },
+    {
+      "fixture": "deseq_nb_linc00370",
+      "gene": "LINC00370",
+      "reason": "actual_or_rough_optimizer_row",
+      "dispersion": 3.2394126833673198,
+      "initial_par": [-13.5134095174237, 43.993929619937703, -0.91086239195479501, 33.7720505971186],
+      "lower": [-30, -30, -30, -30],
+      "upper": [30, 30, 30, 30],
+      "control": {
+        "maxit": 100,
+        "fnscale": 1,
+        "parscale": [1, 1, 1, 1],
+        "ndeps": [0.001, 0.001, 0.001, 0.001],
+        "factr": 10000000,
+        "pgtol": 0,
+        "lmm": 5
+      },
+      "gradient_supplied": true,
+      "result": {
+        "par": [0.47249225053112726, 2.4090627680005143, 0.81474367704050099, 0.43835917787532525],
+        "value": 101.27060992767659,
+        "counts": {
+          "function": 33,
+          "gradient": 33
+        },
+        "convergence": 0,
+        "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+      }
+    },
+    {
       "fixture": "deseq_nb_ppiap86",
       "gene": "PPIAP86",
       "reason": "force_optimizer_probe",

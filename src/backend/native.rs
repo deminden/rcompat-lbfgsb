@@ -6,12 +6,14 @@ const ARMIJO: f64 = 1e-4;
 const BACKTRACK: f64 = 0.4995;
 const BOUND_TOL: f64 = 1e-12;
 const CURVATURE_EPS: f64 = 1e-12;
+const FINITE_DIFF_PROJECTED_GRADIENT_NOISE: f64 = 1e-8;
 const HISTORY_CURVATURE_EPS: f64 = f64::EPSILON;
 const INTERPOLATION_DAMPING: f64 = 0.999;
 const MAX_LINE_SEARCH_TRIALS: usize = 20;
+const MAIN_PATH_MIN_STEP: f64 = 1e-16;
 const MIN_STEP: f64 = 1e-14;
 const MORE_THUENTE_BRACKET_SHRINK: f64 = 0.66;
-const MORE_THUENTE_FTOL: f64 = ARMIJO;
+const MORE_THUENTE_FTOL: f64 = 1e-3;
 const MORE_THUENTE_XTRAPU: f64 = 4.0;
 #[cfg(test)]
 const STRONG_WOLFE_UNBOUNDED_MAX_STEP: f64 = 1.0e20;
@@ -82,6 +84,12 @@ impl NativeBackend {
             .iter()
             .chain(upper.iter())
             .any(|value| value.is_infinite());
+        let has_finite_bound = lower
+            .iter()
+            .chain(upper.iter())
+            .any(|value| value.is_finite());
+
+        let min_step = min_step_for_modes(modes);
 
         for iteration in 1..=control.maxit.saturating_add(1) {
             let projected_norm = projected_gradient_norm(&x, &gradient, lower, upper);
@@ -91,6 +99,7 @@ impl NativeBackend {
                 control.has_user_gradient,
                 x.len(),
                 has_infinite_bound,
+                has_finite_bound,
                 &mut deferred_exact_zero_pgtol,
             ) {
                 if deferred_exact_zero_pgtol
@@ -111,15 +120,22 @@ impl NativeBackend {
 
             maybe_trace_cauchy_point(&x, &gradient, lower, upper, &history, control);
 
-            let mut direction =
-                direction_with_mode(&x, &gradient, lower, upper, &history, modes.direction);
+            let mut direction = direction_with_mode(
+                &x,
+                &gradient,
+                lower,
+                upper,
+                &history,
+                modes.direction,
+                min_step,
+            );
 
             let directional_derivative = dot(&gradient, &direction);
-            if directional_derivative >= 0.0 || norm_inf(&direction) <= MIN_STEP {
+            if directional_derivative >= 0.0 || norm_inf(&direction) <= min_step {
                 direction = steepest_projected_direction(&x, &gradient, lower, upper);
             }
 
-            if dot(&gradient, &direction) >= 0.0 || norm_inf(&direction) <= MIN_STEP {
+            if dot(&gradient, &direction) >= 0.0 || norm_inf(&direction) <= min_step {
                 if deferred_exact_zero_pgtol
                     && control.pgtol == 0.0
                     && has_infinite_bound
@@ -148,6 +164,8 @@ impl NativeBackend {
                     && upper.iter().all(|value| value.is_infinite()),
                 initial_step_cap: initial_step_cap_for_modes(modes, history.is_empty()),
                 allow_quadratic_interpolation: history.is_empty(),
+                min_step,
+                quadratic_interpolation_damping: quadratic_interpolation_damping(control, x.len()),
             };
             let Some(step) =
                 line_search_with_mode(problem, request, &mut counts, modes.line_search, iteration)?
@@ -189,9 +207,10 @@ impl NativeBackend {
                 control.has_user_gradient,
                 x.len(),
                 has_infinite_bound,
+                has_finite_bound,
                 &mut deferred_exact_zero_pgtol,
             ) {
-                if used_multidimensional_interpolation {
+                if control.has_user_gradient && used_multidimensional_interpolation {
                     let evaluation = evaluate(problem, &x, &mut counts)?;
                     value = evaluation.value;
                 }
@@ -283,6 +302,23 @@ fn initial_step_cap_for_modes(modes: BackendModes, history_is_empty: bool) -> Op
     }
 }
 
+fn min_step_for_modes(modes: BackendModes) -> f64 {
+    match modes.line_search {
+        LineSearchMode::MoreThuente => MAIN_PATH_MIN_STEP,
+        LineSearchMode::BacktrackingArmijo => MIN_STEP,
+        #[cfg(test)]
+        LineSearchMode::StrongWolfe | LineSearchMode::MoreThuenteFirstThenBacktracking => MIN_STEP,
+    }
+}
+
+fn quadratic_interpolation_damping(control: BackendControl, dimension: usize) -> f64 {
+    if !control.has_user_gradient && dimension > 1 && (control.pgtol > 0.0 || control.maxit == 0) {
+        1.0
+    } else {
+        INTERPOLATION_DAMPING
+    }
+}
+
 #[derive(Debug, Clone)]
 struct Evaluation {
     value: f64,
@@ -326,6 +362,8 @@ struct LineSearchRequest<'a> {
     cap_initial_unbounded_step: bool,
     initial_step_cap: Option<f64>,
     allow_quadratic_interpolation: bool,
+    min_step: f64,
+    quadratic_interpolation_damping: f64,
 }
 
 fn evaluate<P>(
@@ -355,13 +393,26 @@ fn should_stop_for_projected_gradient(
     has_user_gradient: bool,
     dimension: usize,
     has_infinite_bound: bool,
+    has_finite_bound: bool,
     deferred_exact_zero_pgtol: &mut bool,
 ) -> bool {
-    let compatible_norm = if pgtol == 0.0 && has_user_gradient && projected_norm <= 1e-12 {
-        0.0
+    let zero_pgtol_noise_floor = if pgtol == 0.0 && has_infinite_bound {
+        if has_user_gradient {
+            Some(1e-12)
+        } else if has_finite_bound {
+            Some(FINITE_DIFF_PROJECTED_GRADIENT_NOISE)
+        } else {
+            None
+        }
     } else {
-        projected_norm
+        None
     };
+    let compatible_norm =
+        if zero_pgtol_noise_floor.is_some_and(|noise_floor| projected_norm <= noise_floor) {
+            0.0
+        } else {
+            projected_norm
+        };
 
     if compatible_norm > pgtol {
         return false;
@@ -371,6 +422,7 @@ fn should_stop_for_projected_gradient(
         && compatible_norm == 0.0
         && dimension > 1
         && has_infinite_bound
+        && has_user_gradient
         && !*deferred_exact_zero_pgtol
     {
         *deferred_exact_zero_pgtol = true;
@@ -443,7 +495,7 @@ where
         );
         let step = difference(&candidate, request.x);
 
-        if norm_inf(&step) <= MIN_STEP {
+        if norm_inf(&step) <= request.min_step {
             alpha *= BACKTRACK;
             continue;
         }
@@ -479,6 +531,7 @@ where
                     initial_directional_derivative,
                     initial_alpha,
                     evaluation.value,
+                    request.quadratic_interpolation_damping,
                 ) {
                     used_multidimensional_interpolation = request.x.len() > 1;
                     alpha = interpolated_alpha;
@@ -571,11 +624,11 @@ where
             request.upper,
         );
         let step = difference(&candidate, request.x);
-        if norm_inf(&step) <= MIN_STEP {
+        if norm_inf(&step) <= request.min_step {
             alpha = if bracketed {
                 0.5 * (best.alpha + other.alpha)
             } else {
-                (alpha * BACKTRACK).max(MIN_STEP)
+                (alpha * BACKTRACK).max(request.min_step)
             };
             continue;
         }
@@ -1061,6 +1114,7 @@ fn quadratic_trial_alpha(
     derivative_at_zero: f64,
     trial_alpha: f64,
     trial_value: f64,
+    damping: f64,
 ) -> Option<f64> {
     let denominator = 2.0 * (trial_value - value_at_zero - derivative_at_zero * trial_alpha);
     if denominator <= 0.0 || !denominator.is_finite() {
@@ -1070,7 +1124,7 @@ fn quadratic_trial_alpha(
     let alpha = -derivative_at_zero * trial_alpha * trial_alpha / denominator;
     if alpha > 0.0 && alpha < trial_alpha && alpha.is_finite() {
         if trial_alpha >= 1.0 {
-            Some(alpha * INTERPOLATION_DAMPING)
+            Some(alpha * damping)
         } else {
             Some(alpha)
         }
@@ -1302,26 +1356,28 @@ fn direction_with_mode(
     upper: &[f64],
     history: &[Correction],
     mode: DirectionMode,
+    min_step: f64,
 ) -> Vec<f64> {
     match mode {
         DirectionMode::ProjectedLbfgs => {
             projected_lbfgs_direction(x, gradient, lower, upper, history)
         }
         DirectionMode::CauchySubspace => {
-            cauchy_subspace_direction(x, gradient, lower, upper, history)
+            cauchy_subspace_direction(x, gradient, lower, upper, history, min_step)
                 .unwrap_or_else(|| projected_lbfgs_direction(x, gradient, lower, upper, history))
         }
         #[cfg(test)]
         DirectionMode::CauchySubspaceCappedFirstStep => {
-            cauchy_subspace_direction(x, gradient, lower, upper, history)
+            cauchy_subspace_direction(x, gradient, lower, upper, history, min_step)
                 .unwrap_or_else(|| projected_lbfgs_direction(x, gradient, lower, upper, history))
         }
         #[cfg(test)]
         DirectionMode::CauchyFirstThenProjected => {
             if history.is_empty() {
-                cauchy_subspace_direction(x, gradient, lower, upper, history).unwrap_or_else(|| {
-                    projected_lbfgs_direction(x, gradient, lower, upper, history)
-                })
+                cauchy_subspace_direction(x, gradient, lower, upper, history, min_step)
+                    .unwrap_or_else(|| {
+                        projected_lbfgs_direction(x, gradient, lower, upper, history)
+                    })
             } else {
                 projected_lbfgs_direction(x, gradient, lower, upper, history)
             }
@@ -1329,9 +1385,10 @@ fn direction_with_mode(
         #[cfg(test)]
         DirectionMode::CauchyFirstThenProjectedCapped => {
             if history.is_empty() {
-                cauchy_subspace_direction(x, gradient, lower, upper, history).unwrap_or_else(|| {
-                    projected_lbfgs_direction(x, gradient, lower, upper, history)
-                })
+                cauchy_subspace_direction(x, gradient, lower, upper, history, min_step)
+                    .unwrap_or_else(|| {
+                        projected_lbfgs_direction(x, gradient, lower, upper, history)
+                    })
             } else {
                 projected_lbfgs_direction(x, gradient, lower, upper, history)
             }
@@ -1345,13 +1402,14 @@ fn cauchy_subspace_direction(
     lower: &[f64],
     upper: &[f64],
     history: &[Correction],
+    min_step: f64,
 ) -> Option<Vec<f64>> {
     let cauchy = generalized_cauchy_point_limited_memory(x, gradient, lower, upper, history);
     let target = subspace_minimizer_limited_memory(x, gradient, lower, upper, history, &cauchy)
         .map(|point| point.x)
         .unwrap_or(cauchy.x);
     let direction = difference(&target, x);
-    if norm_inf(&direction) <= MIN_STEP {
+    if norm_inf(&direction) <= min_step {
         None
     } else {
         Some(direction)
@@ -2199,6 +2257,8 @@ mod tests {
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
+                min_step: MIN_STEP,
+                quadratic_interpolation_damping: INTERPOLATION_DAMPING,
             },
             &mut counts,
         )
@@ -2232,6 +2292,8 @@ mod tests {
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: true,
+                min_step: MIN_STEP,
+                quadratic_interpolation_damping: INTERPOLATION_DAMPING,
             },
             &mut counts,
         )
@@ -2264,6 +2326,8 @@ mod tests {
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
+                min_step: MIN_STEP,
+                quadratic_interpolation_damping: INTERPOLATION_DAMPING,
             },
             &mut counts,
         )
@@ -2295,6 +2359,8 @@ mod tests {
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
+                min_step: MIN_STEP,
+                quadratic_interpolation_damping: INTERPOLATION_DAMPING,
             },
             &mut counts,
         )
@@ -2326,6 +2392,8 @@ mod tests {
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
+                min_step: MIN_STEP,
+                quadratic_interpolation_damping: INTERPOLATION_DAMPING,
             },
             &mut counts,
         )
@@ -2356,6 +2424,8 @@ mod tests {
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
+                min_step: MIN_STEP,
+                quadratic_interpolation_damping: INTERPOLATION_DAMPING,
             },
             &mut counts,
         )
@@ -2388,6 +2458,8 @@ mod tests {
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
+                min_step: MIN_STEP,
+                quadratic_interpolation_damping: INTERPOLATION_DAMPING,
             },
             &mut counts,
         )
@@ -2822,8 +2894,9 @@ mod tests {
         update_history(&mut history, 5, difference(&x2, &x1), difference(&g2, &g1));
         update_history(&mut history, 5, difference(&x3, &x2), difference(&g3, &g2));
 
-        let direction = cauchy_subspace_direction(&x3, &g3, &lower, &upper, &history)
-            .expect("fourth iteration model should produce a step");
+        let direction =
+            cauchy_subspace_direction(&x3, &g3, &lower, &upper, &history, MAIN_PATH_MIN_STEP)
+                .expect("fourth iteration model should produce a step");
         let value = problem.value(&x3).expect("Rosenbrock value");
         let mut recording = RecordingRosenbrockProblem::default();
         let mut counts = OptimCounts::default();
@@ -2839,6 +2912,8 @@ mod tests {
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
+                min_step: MAIN_PATH_MIN_STEP,
+                quadratic_interpolation_damping: INTERPOLATION_DAMPING,
             },
             &mut counts,
             LineSearchMode::MoreThuente,
@@ -2873,8 +2948,15 @@ mod tests {
         let mut problem = RosenbrockProblem;
         let value = problem.value(&x).expect("Rosenbrock value");
         let gradient = problem.gradient(&x).expect("Rosenbrock gradient");
-        let direction =
-            direction_with_mode(&x, &gradient, &lower, &upper, &history, modes.direction);
+        let direction = direction_with_mode(
+            &x,
+            &gradient,
+            &lower,
+            &upper,
+            &history,
+            modes.direction,
+            MIN_STEP,
+        );
         let mut counts = OptimCounts::default();
 
         let step = line_search(
@@ -2889,6 +2971,8 @@ mod tests {
                 cap_initial_unbounded_step: false,
                 initial_step_cap: initial_step_cap_for_modes(modes, history.is_empty()),
                 allow_quadratic_interpolation: true,
+                min_step: MIN_STEP,
+                quadratic_interpolation_damping: INTERPOLATION_DAMPING,
             },
             &mut counts,
         )
@@ -2931,6 +3015,7 @@ mod tests {
             &upper,
             &history,
             DirectionMode::CauchySubspace,
+            MAIN_PATH_MIN_STEP,
         );
 
         let step = line_search_with_mode(
@@ -2945,6 +3030,8 @@ mod tests {
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
+                min_step: MAIN_PATH_MIN_STEP,
+                quadratic_interpolation_damping: INTERPOLATION_DAMPING,
             },
             &mut counts,
             LineSearchMode::MoreThuente,

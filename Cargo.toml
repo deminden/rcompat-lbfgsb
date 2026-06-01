@@ -1,9 +1,9 @@
 [package]
 name = "rcompat-lbfgsb"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "MIT"
-description = "Clean-room Rust implementation of R-compatible stats::optim L-BFGS-B semantics"
+description = "Rust implementation of R-style stats::optim L-BFGS-B behavior "
 readme = "README.md"
 repository = "https://github.com/deminden/rcompat-lbfgsb"
 categories = ["algorithms", "science"]

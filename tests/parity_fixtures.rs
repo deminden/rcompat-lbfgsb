@@ -69,24 +69,44 @@ fn fixtures_that_are_currently_at_float_noise_match_r() {
     for fixture_json in [
         include_str!("../fixtures/r_optim_lbfgsb/active_bounds.json"),
         include_str!("../fixtures/r_optim_lbfgsb/active_upper_bound.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/all_fixed_2d.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/all_unbounded_2d_quadratic.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/all_unbounded_finite_difference_2d.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/factr_zero_2d_quadratic.json"),
         include_str!("../fixtures/r_optim_lbfgsb/factr_zero_quadratic.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/factr_loose_2d_quadratic.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/fixed_free_2d.json"),
         include_str!("../fixtures/r_optim_lbfgsb/fixed_parameter.json"),
         include_str!("../fixtures/r_optim_lbfgsb/finite_difference.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/fnscale_parscale_finite_difference_2d.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/fnscale_parscale_gradient_2d.json"),
         include_str!("../fixtures/r_optim_lbfgsb/fnscale.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/initial_projected_gradient_2d.json"),
         include_str!("../fixtures/r_optim_lbfgsb/initial_projected_gradient.json"),
         include_str!("../fixtures/r_optim_lbfgsb/initial_outside_bounds.json"),
         include_str!("../fixtures/r_optim_lbfgsb/initial_pos_inf_projected.json"),
         include_str!("../fixtures/r_optim_lbfgsb/initial_neg_inf_projected.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/lower_bounded_finite_difference_2d.json"),
         include_str!("../fixtures/r_optim_lbfgsb/mixed_bounds_quadratic.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/mixed_bounds_finite_difference_2d.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/near_box_finite_difference_2d.json"),
         include_str!("../fixtures/r_optim_lbfgsb/near_lower_finite_difference.json"),
         include_str!("../fixtures/r_optim_lbfgsb/near_upper_finite_difference.json"),
         include_str!("../fixtures/r_optim_lbfgsb/negative_fnscale_gradient.json"),
         include_str!("../fixtures/r_optim_lbfgsb/ndeps_vector.json"),
         include_str!("../fixtures/r_optim_lbfgsb/parscale.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/parscale_bounds_gradient_2d.json"),
         include_str!("../fixtures/r_optim_lbfgsb/parscale_finite_difference.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/pgtol_after_step_2d.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/pgtol_finite_difference_2d.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/pgtol_initial_finite_difference_2d.json"),
         include_str!("../fixtures/r_optim_lbfgsb/pgtol_initial.json"),
         include_str!("../fixtures/r_optim_lbfgsb/quadratic.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/three_dim_box_active.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/three_dim_quadratic.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/two_dim_parscale_finite_difference.json"),
         include_str!("../fixtures/r_optim_lbfgsb/unbounded_quadratic.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/upper_bounded_finite_difference_2d.json"),
         include_str!("../fixtures/r_optim_lbfgsb/zero_dim.json"),
         include_str!("../fixtures/r_optim_lbfgsb/zero_dim_with_gradient.json"),
     ] {
@@ -109,6 +129,10 @@ fn maxit_fixture_matches_r() {
     for fixture_json in [
         include_str!("../fixtures/r_optim_lbfgsb/maxit.json"),
         include_str!("../fixtures/r_optim_lbfgsb/maxit_zero.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/maxit_one_2d_quadratic.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/maxit_zero_2d_quadratic.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/maxit_zero_finite_difference_2d.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/maxit_one_finite_difference_2d.json"),
     ] {
         let fixture: Fixture = serde_json::from_str(fixture_json).unwrap();
         let result = run_fixture(&fixture);
@@ -137,13 +161,16 @@ fn loose_factr_rosenbrock_fixture_matches_r() {
 }
 
 #[test]
-fn lmm_one_rosenbrock_fixture_matches_r() {
-    let fixture: Fixture = serde_json::from_str(include_str!(
-        "../fixtures/r_optim_lbfgsb/lmm_one_rosenbrock.json"
-    ))
-    .unwrap();
-    let result = run_fixture(&fixture);
-    assert_fixture_close(&fixture, &result, 1e-6, 1e-8);
+fn lmm_rosenbrock_fixtures_match_r() {
+    for fixture_json in [
+        include_str!("../fixtures/r_optim_lbfgsb/lmm_one_rosenbrock.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/lmm_two_rosenbrock.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/lmm_ten_rosenbrock.json"),
+    ] {
+        let fixture: Fixture = serde_json::from_str(fixture_json).unwrap();
+        let result = run_fixture(&fixture);
+        assert_fixture_close(&fixture, &result, 1e-6, 1e-8);
+    }
 }
 
 #[test]
@@ -196,6 +223,22 @@ fn run_fixture(fixture: &Fixture) -> OptimResult {
             control,
         )
         .unwrap(),
+        "fixed_free_2d" => optim_lbfgsb_with_gradient(
+            fixture.initial_par.clone(),
+            bounds,
+            |p| (p[0] - 10.0).powi(2) + (p[1] - 2.0).powi(2),
+            |p| vec![2.0 * (p[0] - 10.0), 2.0 * (p[1] - 2.0)],
+            control,
+        )
+        .unwrap(),
+        "all_fixed_2d" => optim_lbfgsb_with_gradient(
+            fixture.initial_par.clone(),
+            bounds,
+            |p| (p[0] - 10.0).powi(2) + (p[1] - 2.0).powi(2),
+            |p| vec![2.0 * (p[0] - 10.0), 2.0 * (p[1] - 2.0)],
+            control,
+        )
+        .unwrap(),
         "finite_difference" => optim_lbfgsb(
             fixture.initial_par.clone(),
             bounds,
@@ -207,6 +250,21 @@ fn run_fixture(fixture: &Fixture) -> OptimResult {
             fixture.initial_par.clone(),
             bounds,
             |p| -(p[0] - 3.0).powi(2),
+            control,
+        )
+        .unwrap(),
+        "fnscale_parscale_gradient_2d" => optim_lbfgsb_with_gradient(
+            fixture.initial_par.clone(),
+            bounds,
+            |p| -((p[0] - 3.0).powi(2) + 2.0 * (p[1] + 1.0).powi(2)),
+            |p| vec![-2.0 * (p[0] - 3.0), -4.0 * (p[1] + 1.0)],
+            control,
+        )
+        .unwrap(),
+        "fnscale_parscale_finite_difference_2d" => optim_lbfgsb(
+            fixture.initial_par.clone(),
+            bounds,
+            |p| -((p[0] - 3.0).powi(2) + 2.0 * (p[1] + 1.0).powi(2)),
             control,
         )
         .unwrap(),
@@ -222,6 +280,14 @@ fn run_fixture(fixture: &Fixture) -> OptimResult {
             fixture.initial_par.clone(),
             bounds,
             |p| (p[0] + 2.0).powi(2),
+            control,
+        )
+        .unwrap(),
+        "initial_projected_gradient_2d" => optim_lbfgsb_with_gradient(
+            fixture.initial_par.clone(),
+            bounds,
+            |p| (p[0] + 2.0).powi(2) + (p[1] + 1.0).powi(2),
+            |p| vec![2.0 * (p[0] + 2.0), 2.0 * (p[1] + 1.0)],
             control,
         )
         .unwrap(),
@@ -248,7 +314,24 @@ fn run_fixture(fixture: &Fixture) -> OptimResult {
             control,
         )
         .unwrap(),
-        "ndeps_vector" => optim_lbfgsb(
+        "mixed_bounds_finite_difference_2d"
+        | "lower_bounded_finite_difference_2d"
+        | "upper_bounded_finite_difference_2d" => optim_lbfgsb(
+            fixture.initial_par.clone(),
+            bounds,
+            |p| (p[0] - 1.0).powi(2) + (p[1] + 2.0).powi(2),
+            control,
+        )
+        .unwrap(),
+        "all_unbounded_2d_quadratic" => optim_lbfgsb_with_gradient(
+            fixture.initial_par.clone(),
+            bounds,
+            |p| (p[0] - 1.0).powi(2) + 2.0 * (p[1] + 2.0).powi(2),
+            |p| vec![2.0 * (p[0] - 1.0), 4.0 * (p[1] + 2.0)],
+            control,
+        )
+        .unwrap(),
+        "ndeps_vector" | "all_unbounded_finite_difference_2d" => optim_lbfgsb(
             fixture.initial_par.clone(),
             bounds,
             |p| (p[0] - 1.0).powi(2) + (p[1] + 2.0).powi(2),
@@ -269,11 +352,26 @@ fn run_fixture(fixture: &Fixture) -> OptimResult {
             control,
         )
         .unwrap(),
+        "near_box_finite_difference_2d" => optim_lbfgsb(
+            fixture.initial_par.clone(),
+            bounds,
+            |p| (p[0] - 0.25).powi(2) + 2.0 * (p[1] + 0.25).powi(2),
+            control,
+        )
+        .unwrap(),
         "parscale" => optim_lbfgsb_with_gradient(
             fixture.initial_par.clone(),
             bounds,
             |p| (p[0] - 4.0).powi(2),
             |p| vec![2.0 * (p[0] - 4.0)],
+            control,
+        )
+        .unwrap(),
+        "parscale_bounds_gradient_2d" => optim_lbfgsb_with_gradient(
+            fixture.initial_par.clone(),
+            bounds,
+            |p| (p[0] - 6.0).powi(2) + 2.0 * (p[1] - 0.75).powi(2),
+            |p| vec![2.0 * (p[0] - 6.0), 4.0 * (p[1] - 0.75)],
             control,
         )
         .unwrap(),
@@ -284,11 +382,47 @@ fn run_fixture(fixture: &Fixture) -> OptimResult {
             control,
         )
         .unwrap(),
+        "two_dim_parscale_finite_difference" => optim_lbfgsb(
+            fixture.initial_par.clone(),
+            bounds,
+            |p| (p[0] - 1.0).powi(2) + 3.0 * (p[1] + 2.0).powi(2),
+            control,
+        )
+        .unwrap(),
         "pgtol_initial" => optim_lbfgsb_with_gradient(
             fixture.initial_par.clone(),
             bounds,
             |p| (p[0] - 2.0).powi(2),
             |p| vec![2.0 * (p[0] - 2.0)],
+            control,
+        )
+        .unwrap(),
+        "pgtol_finite_difference_2d"
+        | "pgtol_initial_finite_difference_2d"
+        | "maxit_zero_finite_difference_2d"
+        | "maxit_one_finite_difference_2d" => optim_lbfgsb(
+            fixture.initial_par.clone(),
+            bounds,
+            |p| (p[0] - 1.0).powi(2) + (p[1] + 2.0).powi(2),
+            control,
+        )
+        .unwrap(),
+        "pgtol_after_step_2d" => optim_lbfgsb_with_gradient(
+            fixture.initial_par.clone(),
+            bounds,
+            |p| (p[0] - 1.0).powi(2) + (p[1] + 2.0).powi(2),
+            |p| vec![2.0 * (p[0] - 1.0), 2.0 * (p[1] + 2.0)],
+            control,
+        )
+        .unwrap(),
+        "factr_zero_2d_quadratic"
+        | "factr_loose_2d_quadratic"
+        | "maxit_one_2d_quadratic"
+        | "maxit_zero_2d_quadratic" => optim_lbfgsb_with_gradient(
+            fixture.initial_par.clone(),
+            bounds,
+            |p| (p[0] - 1.0).powi(2) + (p[1] + 2.0).powi(2),
+            |p| vec![2.0 * (p[0] - 1.0), 2.0 * (p[1] + 2.0)],
             control,
         )
         .unwrap(),
@@ -321,6 +455,22 @@ fn run_fixture(fixture: &Fixture) -> OptimResult {
             control,
         )
         .unwrap(),
+        "three_dim_quadratic" => optim_lbfgsb_with_gradient(
+            fixture.initial_par.clone(),
+            bounds,
+            |p| (p[0] - 1.0).powi(2) + 3.0 * (p[1] + 2.0).powi(2) + 0.5 * (p[2] - 0.25).powi(2),
+            |p| vec![2.0 * (p[0] - 1.0), 6.0 * (p[1] + 2.0), p[2] - 0.25],
+            control,
+        )
+        .unwrap(),
+        "three_dim_box_active" => optim_lbfgsb_with_gradient(
+            fixture.initial_par.clone(),
+            bounds,
+            |p| (p[0] - 5.0).powi(2) + (p[1] + 2.0).powi(2) + (p[2] - 0.25).powi(2),
+            |p| vec![2.0 * (p[0] - 5.0), 2.0 * (p[1] + 2.0), 2.0 * (p[2] - 0.25)],
+            control,
+        )
+        .unwrap(),
         "unbounded_quadratic" => optim_lbfgsb_with_gradient(
             fixture.initial_par.clone(),
             bounds,
@@ -329,21 +479,23 @@ fn run_fixture(fixture: &Fixture) -> OptimResult {
             control,
         )
         .unwrap(),
-        "rosenbrock" | "factr_loose_rosenbrock" | "lmm_one_rosenbrock" => {
-            optim_lbfgsb_with_gradient(
-                fixture.initial_par.clone(),
-                bounds,
-                |p| 100.0 * (p[1] - p[0] * p[0]).powi(2) + (1.0 - p[0]).powi(2),
-                |p| {
-                    vec![
-                        -400.0 * p[0] * (p[1] - p[0] * p[0]) - 2.0 * (1.0 - p[0]),
-                        200.0 * (p[1] - p[0] * p[0]),
-                    ]
-                },
-                control,
-            )
-            .unwrap()
-        }
+        "rosenbrock"
+        | "factr_loose_rosenbrock"
+        | "lmm_one_rosenbrock"
+        | "lmm_two_rosenbrock"
+        | "lmm_ten_rosenbrock" => optim_lbfgsb_with_gradient(
+            fixture.initial_par.clone(),
+            bounds,
+            |p| 100.0 * (p[1] - p[0] * p[0]).powi(2) + (1.0 - p[0]).powi(2),
+            |p| {
+                vec![
+                    -400.0 * p[0] * (p[1] - p[0] * p[0]) - 2.0 * (1.0 - p[0]),
+                    200.0 * (p[1] - p[0] * p[0]),
+                ]
+            },
+            control,
+        )
+        .unwrap(),
         other => panic!("unknown fixture {other}"),
     }
 }
@@ -370,22 +522,22 @@ fn assert_fixture_close(
 ) {
     assert_eq!(
         result.convergence, fixture.result.convergence,
-        "{} convergence mismatch: {}",
-        fixture.fixture, result.message
+        "{} convergence mismatch: result={result:?}",
+        fixture.fixture
     );
     assert_eq!(
         result.message, fixture.result.message,
-        "{} message mismatch",
+        "{} message mismatch: result={result:?}",
         fixture.fixture
     );
     assert_eq!(
         result.counts.function, fixture.result.counts.function,
-        "{} function-count mismatch",
+        "{} function-count mismatch: result={result:?}",
         fixture.fixture
     );
     assert_eq!(
         result.counts.gradient, fixture.result.counts.gradient,
-        "{} gradient-count mismatch",
+        "{} gradient-count mismatch: result={result:?}",
         fixture.fixture
     );
     for (actual, expected) in result.par.iter().zip(fixture.result.par.iter()) {

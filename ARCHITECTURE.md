@@ -50,6 +50,36 @@ minimizer, and More-Thuente-style line search with bracketed
 cubic/quadratic/secant step updates. That is the current main R-compatibility
 path.
 
+The production More-Thuente sufficient-decrease tolerance is `1e-3`, matching
+the L-BFGS-B line-search behavior observed through R fixtures. The older
+projected Armijo fallback keeps its separate smaller sufficient-decrease
+constant because it is used only for one-dimensional and finite-difference
+paths that already match their R fixtures.
+
+The More-Thuente main path uses a machine-epsilon-scale minimum step so
+finite-bound supplied-gradient problems can take R's final tiny cleanup step
+before `pgtol = 0` convergence. The Armijo fallback keeps the older, larger
+minimum step because lowering it changes finite-difference evaluation counts.
+The near-zero projected-gradient compatibility shortcut is limited to
+infinite-bound supplied-gradient cases, where committed fixtures show R and the
+clean-room floating-point path can differ by representational noise.
+No-gradient finite-difference problems with mixed finite/infinite bounds have
+their own larger projected-gradient noise floor because the stencil can leave a
+near-optimal point with a tiny nonzero gradient while R still reports
+projected-gradient convergence. Fully unbounded finite-difference problems do
+not use that shortcut because R takes one additional cleanup evaluation there.
+The one-iteration exact-zero `pgtol` deferral is kept to supplied-gradient
+infinite-bound cases only.
+The final value refresh after multidimensional interpolation is also limited to
+supplied-gradient problems; no-gradient finite-difference fixtures already have
+the accepted final value and R does not charge an extra optimizer-level
+evaluation there.
+For multi-dimensional finite-difference paths with positive `pgtol` or
+`maxit = 0`, the quadratic interpolation trial is not damped, matching R cases
+where the first accepted trial is also the reported final point. The older
+damping stays in place for default exact-zero `pgtol` and one-dimensional
+fallback cases where committed fixtures depend on the extra cleanup step.
+
 For one-dimensional and finite-difference/no-gradient problems, the backend
 keeps the older projected direction plus Armijo interpolation path because that
 matches R's count and `maxit` edge behavior for those committed fixtures.
@@ -94,8 +124,9 @@ noise.
 
 The DESeq-derived real-data subset is also an active production expectation for
 multi-dimensional supplied-gradient parity. Its compact 4-D negative-binomial
-GLM cases match the generated R `optim` outputs on counts, convergence message,
-final value, and parameters within tight floating-point tolerances.
+GLM cases include actual optimizer-routed genes and force-optimizer probes, and
+match the generated R `optim` outputs on counts, convergence message, final
+value, and parameters within tight floating-point tolerances.
 
 These papers are algorithmic references, not source-code inputs.
 

@@ -303,22 +303,22 @@ fn assert_result_close(
 ) {
     assert_eq!(
         result.convergence, case.result.convergence,
-        "{} convergence mismatch: {}",
-        case.fixture, result.message
+        "{} convergence mismatch: result={result:?}",
+        case.fixture
     );
     assert_eq!(
         result.message, case.result.message,
-        "{} message mismatch",
+        "{} message mismatch: result={result:?}",
         case.fixture
     );
     assert_eq!(
         result.counts.function, case.result.counts.function,
-        "{} function-count mismatch",
+        "{} function-count mismatch: result={result:?}",
         case.fixture
     );
     assert_eq!(
         result.counts.gradient, case.result.counts.gradient,
-        "{} gradient-count mismatch",
+        "{} gradient-count mismatch: result={result:?}",
         case.fixture
     );
     for (actual, expected) in result.par.iter().zip(case.result.par.iter()) {

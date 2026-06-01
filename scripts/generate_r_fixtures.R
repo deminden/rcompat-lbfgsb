@@ -271,12 +271,42 @@ write_fixture(
 )
 
 write_fixture(
+  "fixed_free_2d",
+  initial_par = c(1.5, 0.0),
+  lower = c(1.5, -10.0),
+  upper = c(1.5, 10.0),
+  control = list(),
+  fn = function(p) (p[[1]] - 10.0)^2 + (p[[2]] - 2.0)^2,
+  gr = function(p) c(2.0 * (p[[1]] - 10.0), 2.0 * (p[[2]] - 2.0))
+)
+
+write_fixture(
+  "all_fixed_2d",
+  initial_par = c(1.5, -2.0),
+  lower = c(1.5, -2.0),
+  upper = c(1.5, -2.0),
+  control = list(),
+  fn = function(p) (p[[1]] - 10.0)^2 + (p[[2]] - 2.0)^2,
+  gr = function(p) c(2.0 * (p[[1]] - 10.0), 2.0 * (p[[2]] - 2.0))
+)
+
+write_fixture(
   "initial_projected_gradient",
   initial_par = c(0.0),
   lower = c(0.0),
   upper = c(10.0),
   control = list(),
   fn = function(p) (p[[1]] + 2.0)^2
+)
+
+write_fixture(
+  "initial_projected_gradient_2d",
+  initial_par = c(0.0, -1.0),
+  lower = c(0.0, -10.0),
+  upper = c(10.0, 10.0),
+  control = list(),
+  fn = function(p) (p[[1]] + 2.0)^2 + (p[[2]] + 1.0)^2,
+  gr = function(p) c(2.0 * (p[[1]] + 2.0), 2.0 * (p[[2]] + 1.0))
 )
 
 write_fixture(
@@ -300,12 +330,106 @@ write_fixture(
 )
 
 write_fixture(
+  "mixed_bounds_finite_difference_2d",
+  initial_par = c(3.0, -4.0),
+  lower = c(0.0, -Inf),
+  upper = c(Inf, 0.0),
+  control = list(ndeps = c(1e-4, 2e-4)),
+  fn = function(p) (p[[1]] - 1.0)^2 + (p[[2]] + 2.0)^2
+)
+
+write_fixture(
+  "lower_bounded_finite_difference_2d",
+  initial_par = c(4.0, -5.0),
+  lower = c(-10.0, -10.0),
+  upper = c(Inf, Inf),
+  control = list(ndeps = c(1e-4, 2e-4)),
+  fn = function(p) (p[[1]] - 1.0)^2 + (p[[2]] + 2.0)^2
+)
+
+write_fixture(
+  "upper_bounded_finite_difference_2d",
+  initial_par = c(4.0, -5.0),
+  lower = c(-Inf, -Inf),
+  upper = c(10.0, 10.0),
+  control = list(ndeps = c(1e-4, 2e-4)),
+  fn = function(p) (p[[1]] - 1.0)^2 + (p[[2]] + 2.0)^2
+)
+
+write_fixture(
+  "all_unbounded_2d_quadratic",
+  initial_par = c(4.0, -5.0),
+  lower = c(-Inf, -Inf),
+  upper = c(Inf, Inf),
+  control = list(),
+  fn = function(p) (p[[1]] - 1.0)^2 + 2.0 * (p[[2]] + 2.0)^2,
+  gr = function(p) c(2.0 * (p[[1]] - 1.0), 4.0 * (p[[2]] + 2.0))
+)
+
+write_fixture(
+  "all_unbounded_finite_difference_2d",
+  initial_par = c(4.0, -5.0),
+  lower = c(-Inf, -Inf),
+  upper = c(Inf, Inf),
+  control = list(ndeps = c(1e-4, 2e-4)),
+  fn = function(p) (p[[1]] - 1.0)^2 + (p[[2]] + 2.0)^2
+)
+
+write_fixture(
+  "three_dim_quadratic",
+  initial_par = c(3.0, -4.0, 0.5),
+  lower = c(-10.0, -10.0, -10.0),
+  upper = c(10.0, 10.0, 10.0),
+  control = list(),
+  fn = function(p) (p[[1]] - 1.0)^2 + 3.0 * (p[[2]] + 2.0)^2 + 0.5 * (p[[3]] - 0.25)^2,
+  gr = function(p) c(2.0 * (p[[1]] - 1.0), 6.0 * (p[[2]] + 2.0), p[[3]] - 0.25)
+)
+
+write_fixture(
+  "three_dim_box_active",
+  initial_par = c(3.0, -4.0, 0.5),
+  lower = c(0.0, -3.0, -1.0),
+  upper = c(2.0, 0.0, 1.0),
+  control = list(),
+  fn = function(p) (p[[1]] - 5.0)^2 + (p[[2]] + 2.0)^2 + (p[[3]] - 0.25)^2,
+  gr = function(p) c(2.0 * (p[[1]] - 5.0), 2.0 * (p[[2]] + 2.0), 2.0 * (p[[3]] - 0.25))
+)
+
+write_fixture(
+  "parscale_bounds_gradient_2d",
+  initial_par = c(0.0, 0.0),
+  lower = c(-4.0, -1.0),
+  upper = c(8.0, 1.0),
+  control = list(parscale = c(2.0, 0.5)),
+  fn = function(p) (p[[1]] - 6.0)^2 + 2.0 * (p[[2]] - 0.75)^2,
+  gr = function(p) c(2.0 * (p[[1]] - 6.0), 4.0 * (p[[2]] - 0.75))
+)
+
+write_fixture(
   "parscale_finite_difference",
   initial_par = c(0.0),
   lower = c(-10.0),
   upper = c(10.0),
   control = list(parscale = c(2.0), ndeps = c(1e-4)),
   fn = function(p) (p[[1]] - 4.0)^2
+)
+
+write_fixture(
+  "two_dim_parscale_finite_difference",
+  initial_par = c(4.0, -5.0),
+  lower = c(-10.0, -10.0),
+  upper = c(10.0, 10.0),
+  control = list(parscale = c(2.0, 0.5), ndeps = c(1e-4, 2e-4)),
+  fn = function(p) (p[[1]] - 1.0)^2 + 3.0 * (p[[2]] + 2.0)^2
+)
+
+write_fixture(
+  "near_box_finite_difference_2d",
+  initial_par = c(0.99995, -0.99995),
+  lower = c(-1.0, -1.0),
+  upper = c(1.0, 1.0),
+  control = list(ndeps = c(1e-4, 2e-4)),
+  fn = function(p) (p[[1]] - 0.25)^2 + 2.0 * (p[[2]] + 0.25)^2
 )
 
 write_fixture(
@@ -337,6 +461,34 @@ write_fixture(
 )
 
 write_fixture(
+  "maxit_zero_2d_quadratic",
+  initial_par = c(3.0, -4.0),
+  lower = c(-10.0, -10.0),
+  upper = c(10.0, 10.0),
+  control = list(maxit = 0),
+  fn = function(p) (p[[1]] - 1.0)^2 + (p[[2]] + 2.0)^2,
+  gr = function(p) c(2.0 * (p[[1]] - 1.0), 2.0 * (p[[2]] + 2.0))
+)
+
+write_fixture(
+  "maxit_zero_finite_difference_2d",
+  initial_par = c(4.0, -5.0),
+  lower = c(-10.0, -10.0),
+  upper = c(10.0, 10.0),
+  control = list(maxit = 0, ndeps = c(1e-4, 2e-4)),
+  fn = function(p) (p[[1]] - 1.0)^2 + (p[[2]] + 2.0)^2
+)
+
+write_fixture(
+  "maxit_one_finite_difference_2d",
+  initial_par = c(4.0, -5.0),
+  lower = c(-10.0, -10.0),
+  upper = c(10.0, 10.0),
+  control = list(maxit = 1, ndeps = c(1e-4, 2e-4)),
+  fn = function(p) (p[[1]] - 1.0)^2 + (p[[2]] + 2.0)^2
+)
+
+write_fixture(
   "pgtol_initial",
   initial_par = c(1.95),
   lower = c(-10.0),
@@ -347,6 +499,64 @@ write_fixture(
 )
 
 write_fixture(
+  "pgtol_initial_finite_difference_2d",
+  initial_par = c(1.01, -2.02),
+  lower = c(-10.0, -10.0),
+  upper = c(10.0, 10.0),
+  control = list(pgtol = 0.05, ndeps = c(1e-4, 2e-4)),
+  fn = function(p) (p[[1]] - 1.0)^2 + (p[[2]] + 2.0)^2
+)
+
+write_fixture(
+  "pgtol_finite_difference_2d",
+  initial_par = c(4.0, -5.0),
+  lower = c(-10.0, -10.0),
+  upper = c(10.0, 10.0),
+  control = list(pgtol = 0.25, ndeps = c(1e-4, 2e-4)),
+  fn = function(p) (p[[1]] - 1.0)^2 + (p[[2]] + 2.0)^2
+)
+
+write_fixture(
+  "pgtol_after_step_2d",
+  initial_par = c(6.0, -6.0),
+  lower = c(-10.0, -10.0),
+  upper = c(10.0, 10.0),
+  control = list(pgtol = 0.5),
+  fn = function(p) (p[[1]] - 1.0)^2 + (p[[2]] + 2.0)^2,
+  gr = function(p) c(2.0 * (p[[1]] - 1.0), 2.0 * (p[[2]] + 2.0))
+)
+
+write_fixture(
+  "maxit_one_2d_quadratic",
+  initial_par = c(3.0, -4.0),
+  lower = c(-10.0, -10.0),
+  upper = c(10.0, 10.0),
+  control = list(maxit = 1),
+  fn = function(p) (p[[1]] - 1.0)^2 + (p[[2]] + 2.0)^2,
+  gr = function(p) c(2.0 * (p[[1]] - 1.0), 2.0 * (p[[2]] + 2.0))
+)
+
+write_fixture(
+  "factr_zero_2d_quadratic",
+  initial_par = c(3.0, -4.0),
+  lower = c(-10.0, -10.0),
+  upper = c(10.0, 10.0),
+  control = list(factr = 0.0),
+  fn = function(p) (p[[1]] - 1.0)^2 + (p[[2]] + 2.0)^2,
+  gr = function(p) c(2.0 * (p[[1]] - 1.0), 2.0 * (p[[2]] + 2.0))
+)
+
+write_fixture(
+  "factr_loose_2d_quadratic",
+  initial_par = c(3.0, -4.0),
+  lower = c(-10.0, -10.0),
+  upper = c(10.0, 10.0),
+  control = list(factr = 1e12),
+  fn = function(p) (p[[1]] - 1.0)^2 + (p[[2]] + 2.0)^2,
+  gr = function(p) c(2.0 * (p[[1]] - 1.0), 2.0 * (p[[2]] + 2.0))
+)
+
+write_fixture(
   "negative_fnscale_gradient",
   initial_par = c(0.0),
   lower = c(-10.0),
@@ -354,6 +564,25 @@ write_fixture(
   control = list(fnscale = -1.0),
   fn = function(p) -(p[[1]] - 3.0)^2,
   gr = function(p) c(-2.0 * (p[[1]] - 3.0))
+)
+
+write_fixture(
+  "fnscale_parscale_gradient_2d",
+  initial_par = c(0.0, 0.0),
+  lower = c(-10.0, -10.0),
+  upper = c(10.0, 10.0),
+  control = list(fnscale = -1.0, parscale = c(2.0, 0.5)),
+  fn = function(p) -((p[[1]] - 3.0)^2 + 2.0 * (p[[2]] + 1.0)^2),
+  gr = function(p) c(-2.0 * (p[[1]] - 3.0), -4.0 * (p[[2]] + 1.0))
+)
+
+write_fixture(
+  "fnscale_parscale_finite_difference_2d",
+  initial_par = c(0.0, 0.0),
+  lower = c(-10.0, -10.0),
+  upper = c(10.0, 10.0),
+  control = list(fnscale = -1.0, parscale = c(2.0, 0.5), ndeps = c(1e-4, 2e-4)),
+  fn = function(p) -((p[[1]] - 3.0)^2 + 2.0 * (p[[2]] + 1.0)^2)
 )
 
 write_fixture(
@@ -430,6 +659,32 @@ write_fixture(
   )
 )
 
+write_fixture(
+  "lmm_two_rosenbrock",
+  initial_par = c(-1.2, 1.0),
+  lower = c(-5.0, -5.0),
+  upper = c(5.0, 5.0),
+  control = list(lmm = 2),
+  fn = function(p) 100.0 * (p[[2]] - p[[1]] * p[[1]])^2 + (1.0 - p[[1]])^2,
+  gr = function(p) c(
+    -400.0 * p[[1]] * (p[[2]] - p[[1]] * p[[1]]) - 2.0 * (1.0 - p[[1]]),
+    200.0 * (p[[2]] - p[[1]] * p[[1]])
+  )
+)
+
+write_fixture(
+  "lmm_ten_rosenbrock",
+  initial_par = c(-1.2, 1.0),
+  lower = c(-5.0, -5.0),
+  upper = c(5.0, 5.0),
+  control = list(lmm = 10),
+  fn = function(p) 100.0 * (p[[2]] - p[[1]] * p[[1]])^2 + (1.0 - p[[1]])^2,
+  gr = function(p) c(
+    -400.0 * p[[1]] * (p[[2]] - p[[1]] * p[[1]]) - 2.0 * (1.0 - p[[1]]),
+    200.0 * (p[[2]] - p[[1]] * p[[1]])
+  )
+)
+
 write_error_fixture(
   "fixed_no_gradient_error",
   initial_par = c(1.5),
@@ -465,6 +720,9 @@ write_deseq_real_subset <- function() {
   genes <- c(
     "MTND1P23",
     "IGKV1-27",
+    "LINC02172",
+    "CYP11B1",
+    "LINC00370",
     "PPIAP86",
     "ENSG00000249901",
     "ENSG00000301330",
