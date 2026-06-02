@@ -1,0 +1,28 @@
+{
+  "fixture": "rosenbrock_finite_difference_box",
+  "initial_par": [-1.2, 1],
+  "lower": [-5, -5],
+  "upper": [5, 5],
+  "control": {
+    "maxit": 100,
+    "fnscale": 1,
+    "parscale": [1, 1],
+    "ndeps": [0.0001, 0.00020000000000000001],
+    "factr": 10000000,
+    "pgtol": 0,
+    "lmm": 5
+  },
+  "gradient_supplied": false,
+  "result": {
+    "par": [0.9999981113313513, 0.99999619449368438],
+    "value": 3.646438720621977e-12,
+    "counts": {
+      "function": 50,
+      "gradient": 50
+    },
+    "convergence": 0,
+    "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+  },
+  "r_version": "R version 4.4.3 (2025-02-28)",
+  "platform": "x86_64-conda-linux-gnu"
+}

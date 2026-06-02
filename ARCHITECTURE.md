@@ -40,27 +40,66 @@ control semantics; projected-gradient convergence and iteration limits still
 apply.
 
 Backend trace diagnostics include the accepted line-search trial count, accepted
-alpha, feasible alpha cap, and step norm, plus a curvature-condition diagnostic.
-High-verbosity traces also include the accepted parameters and gradient so R
-trace output can be compared when investigating remaining path drift.
+alpha, feasible alpha cap, step norm, signed relative objective reduction, and
+a curvature-condition diagnostic. High-verbosity traces also include the
+accepted parameters and gradient so R trace output can be compared when
+investigating remaining path drift.
 
-For multi-dimensional supplied-gradient problems, the native backend uses an
-independently written generalized Cauchy point, dense free-variable subspace
+The `factr` convergence check uses R's signed relative decrease
+`old_f - new_f`, not an absolute objective delta. This is equivalent on normal
+descent steps and preserves R behavior for rare accepted non-decreasing steps.
+
+For multi-dimensional supplied-gradient problems, and for multi-dimensional
+objective-only problems whose bounds form a fully finite box, the native backend
+uses an independently written generalized Cauchy point, free-variable subspace
 minimizer, and More-Thuente-style line search with bracketed
 cubic/quadratic/secant step updates. That is the current main R-compatibility
-path.
+path, including DESeq2-style `[-30, 30]` coefficient boxes.
+
+For smaller objective-only finite-box problems, the subspace minimizer uses a
+clean-room compact-matrix solve shaped after the L-BFGS-B 2.3 algorithmic
+description used by R's bundled optimizer. The gate is intentionally limited to
+dimensions up to 10 because the current compact subspace solve reduces the
+hard-real worst optimizer-count drift from 18 to 10 there, while wider full
+designs still need the Cauchy workspace ported before the compact arithmetic is
+universally better.
+
+The objective-only finite-box main path includes one early limited-memory
+refresh guard for the Cauchy/subspace model. R's bundled L-BFGS-B 2.3 can
+discard correction history after a compact subspace factorization failure; the
+clean-room backend mirrors the observed shape by restarting from an identity
+model when the early subspace target is explosively far beyond the generalized
+Cauchy step. This is guarded by hard-real trace fixtures rather than treated as
+a tunable convergence setting.
 
 The production More-Thuente sufficient-decrease tolerance is `1e-3`, matching
 the L-BFGS-B line-search behavior observed through R fixtures. The older
 projected Armijo fallback keeps its separate smaller sufficient-decrease
-constant because it is used only for one-dimensional and finite-difference
-paths that already match their R fixtures.
+constant because it is used only for one-dimensional and mixed/infinite-bound
+finite-difference paths that already match their R fixtures.
 
 For bounded multi-dimensional supplied-gradient problems, the first constrained
 More-Thuente trial is capped at `stp = 1`, matching the L-BFGS-B 2.3 code path
 bundled with R. When that capped trial satisfies sufficient decrease and keeps
 descending, the native backend accepts it as a successful R-style `STPMAX`
 warning case instead of forcing another extrapolation.
+For smaller objective-only finite-box Cauchy/subspace targets that land exactly
+on a finite bound, the main line search preserves R's full-step copy shape by
+reusing the precomputed target when `stp == 1` instead of recomputing `x + d`.
+The guard is kept narrow because supplied-gradient cases and larger weakly
+identified hard-real full-design cases still track R better when the clean-room
+dense subspace target is recomputed through the same arithmetic used for
+non-unit steps.
+
+The main path also has a narrow R-style line-search recovery for flat or
+nonconvex cases. If a line search exhausts its trial budget while correction
+history exists, the backend clears the limited-memory history and retries the
+same iteration once from the current point. On that retry only, a sufficiently
+decreasing point in a narrowed More-Thuente bracket can be accepted as a warning
+shaped step. The committed `line_search_refresh_sin_quad` fixture guards the
+public R behavior: a finite-box objective-only sinusoidal quadratic emits a
+line-search memory refresh in R and converges by `factr` rather than returning
+abnormal termination.
 
 The More-Thuente main path uses a machine-epsilon-scale minimum step so
 finite-bound supplied-gradient problems can take R's final tiny cleanup step
@@ -76,6 +115,17 @@ projected-gradient convergence. Fully unbounded finite-difference problems do
 not use that shortcut because R takes one additional cleanup evaluation there.
 The one-iteration exact-zero `pgtol` deferral is kept to supplied-gradient
 infinite-bound cases only.
+The projected-gradient norm itself follows R's bound-distance cap: for a
+negative gradient near an upper bound, or a positive gradient near a lower
+bound, the component is limited by the distance to that bound rather than using
+the raw gradient magnitude. The `pgtol_near_upper_uses_bound_distance` fixture
+guards this initial-convergence behavior.
+The objective-only finite-box Cauchy/subspace free-variable set uses exact
+bound hits after projection, while supplied-gradient paths and the fallback
+direction projection keep a tiny roundoff tolerance when blocking outward
+motion. This split preserves R fixture behavior for near-zero finite-difference
+bound cleanup and supplied-gradient DESeq cases while improving hard-real
+objective-only subspace routing.
 The final value refresh after multidimensional interpolation is also limited to
 supplied-gradient problems; no-gradient finite-difference fixtures already have
 the accepted final value and R does not charge an extra optimizer-level
@@ -86,9 +136,18 @@ where the first accepted trial is also the reported final point. The older
 damping stays in place for default exact-zero `pgtol` and one-dimensional
 fallback cases where committed fixtures depend on the extra cleanup step.
 
-For one-dimensional and finite-difference/no-gradient problems, the backend
-keeps the older projected direction plus Armijo interpolation path because that
-matches R's count and `maxit` edge behavior for those committed fixtures.
+For one-dimensional no-gradient problems, and for no-gradient problems with at
+least one infinite bound, the backend keeps the older projected direction plus
+Armijo interpolation path because that matches R's count and `maxit` edge
+behavior for those committed fixtures. Fully finite multi-dimensional
+objective-only boxes use the main Cauchy/subspace path instead.
+
+Finite-difference gradients intentionally follow R's bounded-stencil raw
+objective-call order: evaluate the forward point first, then the backward point
+or clamped base point. A pure objective gives the same gradient if the clamped
+base value is cached or evaluated in the opposite one-sided order, but R's
+black-box call trace exposes the order, so the compatibility layer preserves
+the user-visible closure-call semantics.
 
 L-BFGS history updates use the Algorithm 778 machine-epsilon-scale curvature
 skip test based on the previous directional derivative, with a norm-scaled
@@ -138,6 +197,13 @@ force-optimizer probes selected from a full ignored-data scan where 491 of 512
 DESeq rows matched the strict active contract. The committed cases match the
 generated R `optim` outputs on counts, convergence message, final value, and
 parameters within tight floating-point tolerances.
+
+The DESeq2 hard-real subset exercises objective-only finite-difference parity
+on 8 finite-box contrasts and 48 hard optimizer rows. The main path now matches
+optimizer-level counts exactly for 36 rows and keeps all committed cases within
+tight objective tolerance; weakly identified rows are guarded by objective
+equivalence rather than strict per-coefficient equality. The current worst
+optimizer-count drift in this subset is 10 evaluations.
 
 Setting `DESEQ_PARITY_SCAN=1` keeps the same test running through every case and
 prints per-gene errors for ignored-data scans. `DESEQ_PARITY_SCAN_VERBOSE=1`

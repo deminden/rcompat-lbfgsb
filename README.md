@@ -21,8 +21,22 @@ rules, finite-difference gradients, public result model, and an in-tree bounded
 limited-memory quasi-Newton backend are implemented. The committed parity
 fixtures currently compare `par`, `value`, `counts`, `convergence`, and
 `message` against R-generated reference data for quadratic, Rosenbrock,
-bound-active, fixed-parameter, infinite-bound, scaling, finite-difference, and
-iteration-limit cases.
+bound-active, fixed-parameter, infinite-bound, scaling, finite-difference,
+iteration-limit, and compact objective-only DESeq2-derived negative-binomial
+GLM cases.
+
+For multi-dimensional objective-only problems with fully finite bounds, such as
+DESeq2's `[-30, 30]` coefficient box, the native backend now uses the same main
+Cauchy/subspace path as supplied-gradient problems after building
+finite-difference gradients. Bound-active finite differences also preserve R's
+observed objective-call order, including forward-then-clamped-base calls for
+one-sided lower-bound coordinates. R's projected-gradient norm near finite
+bounds is also preserved by capping the component by the remaining distance to
+the relevant bound. A compact synthetic fixture guards R's line-search
+memory-refresh behavior in a finite-box objective-only nonconvex case. The
+committed hard-real DESeq2 guard covers 48 direct R objective-only optimizer
+replays and currently has exact optimizer-count parity for 36 of them, with
+worst optimizer-count drift bounded at 10.
 
 Known early limitations:
 
@@ -33,6 +47,8 @@ Known early limitations:
   fixture tuning
 - fixed parameters require a supplied gradient, matching R's observed behavior
   for no-gradient finite differences
+- DESeq2-derived fixture parameters can be less strict than likelihood and
+  count parity in weakly identified directions
 
 ## Example
 

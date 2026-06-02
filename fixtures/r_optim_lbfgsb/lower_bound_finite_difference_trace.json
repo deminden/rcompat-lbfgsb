@@ -1,0 +1,22 @@
+{
+  "fixture": "lower_bound_finite_difference_trace",
+  "source_fixture": "lower_bound_finite_difference_trace_probe",
+  "trace_kind": "function_evaluation_points",
+  "first_points": [
+    [0, 1],
+    [0.10000000000000001, 1],
+    [0, 1],
+    [0, 1],
+    [0, 0.90000000000000002]
+  ],
+  "result": {
+    "counts": {
+      "function": 2,
+      "gradient": 2
+    },
+    "convergence": 1,
+    "message": "NEW_X"
+  },
+  "r_version": "R version 4.4.3 (2025-02-28)",
+  "platform": "x86_64-conda-linux-gnu"
+}

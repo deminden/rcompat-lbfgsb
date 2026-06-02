@@ -11,7 +11,6 @@ where
     F: FnMut(&[f64]) -> Result<f64, OptimError>,
 {
     let mut gradient = vec![0.0; x.len()];
-    let mut base_value = None;
 
     for index in 0..x.len() {
         let h = ndeps[index];
@@ -29,40 +28,15 @@ where
         let forward_step = h.min(forward_room);
         let backward_step = h.min(backward_room);
 
-        if forward_step > 0.0 && backward_step > 0.0 {
+        let denominator = forward_step + backward_step;
+        if denominator > 0.0 {
             let mut plus = x.to_vec();
             let mut minus = x.to_vec();
             plus[index] += forward_step;
             minus[index] -= backward_step;
             let f_plus = objective(&plus)?;
             let f_minus = objective(&minus)?;
-            gradient[index] = (f_plus - f_minus) / (forward_step + backward_step);
-        } else if forward_step > 0.0 {
-            let f0 = match base_value {
-                Some(value) => value,
-                None => {
-                    let value = objective(x)?;
-                    base_value = Some(value);
-                    value
-                }
-            };
-            let mut plus = x.to_vec();
-            plus[index] += forward_step;
-            let f_plus = objective(&plus)?;
-            gradient[index] = (f_plus - f0) / forward_step;
-        } else if backward_step > 0.0 {
-            let f0 = match base_value {
-                Some(value) => value,
-                None => {
-                    let value = objective(x)?;
-                    base_value = Some(value);
-                    value
-                }
-            };
-            let mut minus = x.to_vec();
-            minus[index] -= backward_step;
-            let f_minus = objective(&minus)?;
-            gradient[index] = (f0 - f_minus) / backward_step;
+            gradient[index] = (f_plus - f_minus) / denominator;
         } else {
             gradient[index] = 0.0;
         }
@@ -122,5 +96,28 @@ mod tests {
         })
         .unwrap();
         assert_eq!(gradient, vec![0.0]);
+    }
+
+    #[test]
+    fn repeats_base_value_for_each_one_sided_coordinate() {
+        let mut calls = Vec::new();
+        let gradient =
+            finite_difference_gradient(&[0.0, 1.0], &[0.0, -1.0], &[2.0, 1.0], &[0.1, 0.1], |x| {
+                calls.push(x.to_vec());
+                Ok(x[0] + 2.0 * x[1])
+            })
+            .unwrap();
+
+        assert!((gradient[0] - 1.0).abs() < 1e-12);
+        assert!((gradient[1] - 2.0).abs() < 1e-12);
+        assert_eq!(
+            calls,
+            vec![
+                vec![0.1, 1.0],
+                vec![0.0, 1.0],
+                vec![0.0, 1.0],
+                vec![0.0, 0.9],
+            ]
+        );
     }
 }

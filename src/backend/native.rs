@@ -6,6 +6,7 @@ const ARMIJO: f64 = 1e-4;
 const BACKTRACK: f64 = 0.4995;
 const BOUND_TOL: f64 = 1e-12;
 const CURVATURE_EPS: f64 = 1e-12;
+const EXACT_BOUND_UNIT_STEP_MAX_DIMENSION: usize = 9;
 const FINITE_DIFF_PROJECTED_GRADIENT_NOISE: f64 = 1e-8;
 const HISTORY_CURVATURE_EPS: f64 = f64::EPSILON;
 const INTERPOLATION_DAMPING: f64 = 0.999;
@@ -15,6 +16,9 @@ const MIN_STEP: f64 = 1e-14;
 const MORE_THUENTE_BRACKET_SHRINK: f64 = 0.66;
 const MORE_THUENTE_FTOL: f64 = 1e-3;
 const MORE_THUENTE_XTRAPU: f64 = 4.0;
+const MORE_THUENTE_RETRY_WARNING_BRACKET_RATIO: f64 = 0.5;
+const R23_COMPACT_SUBSPACE_MAX_DIMENSION: usize = 10;
+const SUBSPACE_REFRESH_STEP_RATIO: f64 = 70.0;
 #[cfg(test)]
 const STRONG_WOLFE_UNBOUNDED_MAX_STEP: f64 = 1.0e20;
 const WOLFE_CURVATURE: f64 = 0.9;
@@ -48,7 +52,7 @@ impl LbfgsbBackend for NativeBackend {
             lower,
             upper,
             control,
-            BackendModes::for_problem(control, initial.len()),
+            BackendModes::for_problem(control, initial.len(), lower, upper),
         )
     }
 }
@@ -73,6 +77,7 @@ impl NativeBackend {
             mut gradient,
         } = evaluate(problem, &x, &mut counts).map_err(initial_evaluation_error)?;
         let mut history = Vec::<Correction>::new();
+        let mut memory_refreshes = 0_usize;
         let factr_tolerance = if control.factr > 0.0 {
             Some(control.factr * f64::EPSILON)
         } else {
@@ -88,6 +93,8 @@ impl NativeBackend {
             .iter()
             .chain(upper.iter())
             .any(|value| value.is_finite());
+        let subspace_bound_activity =
+            BoundActivity::for_problem(control, initial.len(), lower, upper);
 
         let min_step = min_step_for_modes(modes);
 
@@ -118,78 +125,141 @@ impl NativeBackend {
                 ));
             }
 
-            maybe_trace_cauchy_point(&x, &gradient, lower, upper, &history, control);
+            let mut restarted_after_line_search_failure = false;
+            let step = loop {
+                maybe_trace_cauchy_point(&x, &gradient, lower, upper, &history, control);
 
-            let mut direction = direction_with_mode(
-                &x,
-                &gradient,
-                lower,
-                upper,
-                &history,
-                modes.direction,
-                min_step,
-            );
-
-            let directional_derivative = dot(&gradient, &direction);
-            if directional_derivative >= 0.0 || norm_inf(&direction) <= min_step {
-                direction = steepest_projected_direction(&x, &gradient, lower, upper);
-            }
-
-            if dot(&gradient, &direction) >= 0.0 || norm_inf(&direction) <= min_step {
-                if deferred_exact_zero_pgtol
-                    && control.pgtol == 0.0
-                    && has_infinite_bound
-                    && x.len() > 1
+                let mut direction_choice = direction_with_mode(
+                    &x,
+                    &gradient,
+                    lower,
+                    upper,
+                    &history,
+                    DirectionSettings {
+                        mode: modes.direction,
+                        bound_activity: subspace_bound_activity,
+                        min_step,
+                    },
+                );
+                let can_refresh_subspace_memory =
+                    !control.has_user_gradient && x.len() > 1 && !has_infinite_bound;
+                if can_refresh_subspace_memory
+                    && direction_choice.refresh_history
+                    && memory_refreshes == 0
                 {
-                    let evaluation = evaluate(problem, &x, &mut counts)?;
-                    value = evaluation.value;
+                    if control.trace > 1 {
+                        eprintln!("lbfgs_memory_refresh=subspace_model");
+                    }
+                    history.clear();
+                    memory_refreshes += 1;
+                    direction_choice = direction_with_mode(
+                        &x,
+                        &gradient,
+                        lower,
+                        upper,
+                        &history,
+                        DirectionSettings {
+                            mode: modes.direction,
+                            bound_activity: subspace_bound_activity,
+                            min_step,
+                        },
+                    );
                 }
-                return Ok(success(
-                    x,
-                    value,
-                    counts,
-                    "CONVERGENCE: NORM OF PROJECTED GRADIENT <= PGTOL",
-                ));
-            }
+                let mut direction = direction_choice.direction;
+                let mut unit_step_target = direction_choice.unit_step_target;
 
-            let request = LineSearchRequest {
-                x: &x,
-                value,
-                gradient: &gradient,
-                direction: &direction,
-                lower,
-                upper,
-                // R's bundled L-BFGS-B caps the first constrained line search at stp = 1.
-                max_step_cap: if iteration == 1 && has_finite_bound {
-                    Some(1.0)
-                } else {
-                    None
-                },
-                cap_initial_unbounded_step: history.is_empty()
-                    && lower.iter().all(|value| value.is_infinite())
-                    && upper.iter().all(|value| value.is_infinite()),
-                initial_step_cap: initial_step_cap_for_modes(modes, history.is_empty()),
-                allow_quadratic_interpolation: history.is_empty(),
-                min_step,
-                quadratic_interpolation_damping: quadratic_interpolation_damping(control, x.len()),
-            };
-            let Some(step) =
-                line_search_with_mode(problem, request, &mut counts, modes.line_search, iteration)?
-            else {
-                return Ok(BackendResult {
-                    x,
+                let directional_derivative = dot(&gradient, &direction);
+                if directional_derivative >= 0.0 || norm_inf(&direction) <= min_step {
+                    direction = steepest_projected_direction(&x, &gradient, lower, upper);
+                    unit_step_target = None;
+                }
+
+                if dot(&gradient, &direction) >= 0.0 || norm_inf(&direction) <= min_step {
+                    if deferred_exact_zero_pgtol
+                        && control.pgtol == 0.0
+                        && has_infinite_bound
+                        && x.len() > 1
+                    {
+                        let evaluation = evaluate(problem, &x, &mut counts)?;
+                        value = evaluation.value;
+                    }
+                    return Ok(success(
+                        x,
+                        value,
+                        counts,
+                        "CONVERGENCE: NORM OF PROJECTED GRADIENT <= PGTOL",
+                    ));
+                }
+
+                let request = LineSearchRequest {
+                    x: &x,
                     value,
-                    counts,
-                    convergence: 52,
-                    message: "ERROR: ABNORMAL_TERMINATION_IN_LNSRCH".to_string(),
-                });
+                    gradient: &gradient,
+                    direction: &direction,
+                    unit_step_target: unit_step_target.as_deref(),
+                    lower,
+                    upper,
+                    // R's bundled L-BFGS-B caps the first constrained line search at stp = 1.
+                    max_step_cap: if iteration == 1 && has_finite_bound {
+                        Some(1.0)
+                    } else {
+                        None
+                    },
+                    cap_initial_unbounded_step: history.is_empty()
+                        && lower.iter().all(|value| value.is_infinite())
+                        && upper.iter().all(|value| value.is_infinite()),
+                    initial_step_cap: initial_step_cap_for_modes(modes, history.is_empty()),
+                    allow_quadratic_interpolation: history.is_empty(),
+                    allow_retry_warning_accept: restarted_after_line_search_failure,
+                    min_step,
+                    quadratic_interpolation_damping: quadratic_interpolation_damping(
+                        control,
+                        x.len(),
+                    ),
+                };
+
+                let Some(step) = line_search_with_mode(
+                    problem,
+                    request,
+                    &mut counts,
+                    modes.line_search,
+                    iteration,
+                )?
+                else {
+                    if should_restart_after_line_search_failure(
+                        &history,
+                        restarted_after_line_search_failure,
+                    ) {
+                        if control.trace > 1 {
+                            eprintln!("lbfgs_memory_refresh=line_search");
+                        }
+                        history.clear();
+                        restarted_after_line_search_failure = true;
+                        continue;
+                    }
+                    return Ok(BackendResult {
+                        x,
+                        value,
+                        counts,
+                        convergence: 52,
+                        message: "ERROR: ABNORMAL_TERMINATION_IN_LNSRCH".to_string(),
+                    });
+                };
+
+                break step;
             };
 
-            let relative_reduction =
-                (value - step.value).abs() / value.abs().max(step.value.abs()).max(1.0);
+            let relative_reduction = relative_objective_reduction(value, step.value);
             let next_projected_norm =
                 projected_gradient_norm(&step.x, &step.gradient, lower, upper);
-            maybe_trace(iteration, step.value, next_projected_norm, &step, control);
+            maybe_trace(
+                iteration,
+                step.value,
+                relative_reduction,
+                next_projected_norm,
+                &step,
+                control,
+            );
 
             update_history(
                 &mut history,
@@ -269,8 +339,17 @@ impl Default for BackendModes {
 }
 
 impl BackendModes {
-    fn for_problem(control: BackendControl, dimension: usize) -> Self {
-        if control.has_user_gradient && dimension > 1 {
+    fn for_problem(
+        control: BackendControl,
+        dimension: usize,
+        lower: &[f64],
+        upper: &[f64],
+    ) -> Self {
+        let finite_box = lower
+            .iter()
+            .chain(upper.iter())
+            .all(|value| value.is_finite());
+        if dimension > 1 && (control.has_user_gradient || finite_box) {
             Self::default()
         } else {
             Self {
@@ -291,6 +370,31 @@ enum DirectionMode {
     CauchySubspaceCappedFirstStep,
     #[cfg(test)]
     CauchyFirstThenProjectedCapped,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BoundActivity {
+    Tolerant,
+    Exact,
+}
+
+impl BoundActivity {
+    fn for_problem(
+        control: BackendControl,
+        dimension: usize,
+        lower: &[f64],
+        upper: &[f64],
+    ) -> Self {
+        let finite_box = lower
+            .iter()
+            .chain(upper.iter())
+            .all(|value| value.is_finite());
+        if !control.has_user_gradient && dimension > 1 && finite_box {
+            Self::Exact
+        } else {
+            Self::Tolerant
+        }
+    }
 }
 
 fn initial_step_cap_for_modes(modes: BackendModes, history_is_empty: bool) -> Option<f64> {
@@ -359,17 +463,33 @@ struct SubspacePoint {
     clipped: bool,
 }
 
+#[derive(Debug, Clone)]
+struct DirectionChoice {
+    direction: Vec<f64>,
+    unit_step_target: Option<Vec<f64>>,
+    refresh_history: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct DirectionSettings {
+    mode: DirectionMode,
+    bound_activity: BoundActivity,
+    min_step: f64,
+}
+
 struct LineSearchRequest<'a> {
     x: &'a [f64],
     value: f64,
     gradient: &'a [f64],
     direction: &'a [f64],
+    unit_step_target: Option<&'a [f64]>,
     lower: &'a [f64],
     upper: &'a [f64],
     max_step_cap: Option<f64>,
     cap_initial_unbounded_step: bool,
     initial_step_cap: Option<f64>,
     allow_quadratic_interpolation: bool,
+    allow_retry_warning_accept: bool,
     min_step: f64,
     quadratic_interpolation_damping: f64,
 }
@@ -498,13 +618,7 @@ where
     let mut evaluated_candidates = 0_usize;
 
     for _ in 0..MAX_LINE_SEARCH_TRIALS {
-        let candidate = bounded_step(
-            request.x,
-            request.direction,
-            alpha,
-            request.lower,
-            request.upper,
-        );
+        let candidate = line_search_candidate(&request, alpha);
         let step = difference(&candidate, request.x);
 
         if norm_inf(&step) <= request.min_step {
@@ -632,13 +746,7 @@ where
     let decrease_test = MORE_THUENTE_FTOL * initial_derivative;
 
     for _ in 0..MAX_LINE_SEARCH_TRIALS {
-        let candidate = bounded_step(
-            request.x,
-            request.direction,
-            alpha,
-            request.lower,
-            request.upper,
-        );
+        let candidate = line_search_candidate(&request, alpha);
         let step = difference(&candidate, request.x);
         if norm_inf(&step) <= request.min_step {
             alpha = if bracketed {
@@ -680,6 +788,23 @@ where
         if alpha == max_alpha
             && evaluation.value <= sufficient_decrease
             && derivative <= decrease_test
+        {
+            return Ok(Some(Step {
+                x: candidate,
+                value: evaluation.value,
+                gradient: evaluation.gradient,
+                line_search_trials: evaluated_candidates.saturating_sub(1),
+                alpha,
+                max_alpha,
+                step_norm: norm2(&step),
+                curvature_ratio,
+                wolfe_curvature_satisfied: false,
+                used_multidimensional_interpolation: false,
+            }));
+        }
+        if request.allow_retry_warning_accept
+            && evaluation.value <= sufficient_decrease
+            && more_thuente_retry_warning(best.alpha, other.alpha, bracketed)
         {
             return Ok(Some(Step {
                 x: candidate,
@@ -785,6 +910,15 @@ fn more_thuente_enters_stage_two(
     derivative: f64,
 ) -> bool {
     stage_one && value <= sufficient_decrease && derivative >= 0.0
+}
+
+fn more_thuente_retry_warning(best_alpha: f64, other_alpha: f64, bracketed: bool) -> bool {
+    if !bracketed {
+        return false;
+    }
+    let step_max = best_alpha.max(other_alpha);
+    step_max > 0.0
+        && (other_alpha - best_alpha).abs() <= MORE_THUENTE_RETRY_WARNING_BRACKET_RATIO * step_max
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1066,13 +1200,7 @@ where
         request.value,
         initial_directional_derivative,
         |alpha| {
-            let candidate = bounded_step(
-                request.x,
-                request.direction,
-                alpha,
-                request.lower,
-                request.upper,
-            );
+            let candidate = line_search_candidate(&request, alpha);
             let step = difference(&candidate, request.x);
             let evaluation = evaluate(problem, &candidate, counts)?;
             evaluations += 1;
@@ -1357,6 +1485,22 @@ fn max_feasible_step_allowing_unbounded(
     }
 }
 
+fn line_search_candidate(request: &LineSearchRequest<'_>, alpha: f64) -> Vec<f64> {
+    if alpha == 1.0 {
+        if let Some(target) = request.unit_step_target {
+            return target.to_vec();
+        }
+    }
+
+    bounded_step(
+        request.x,
+        request.direction,
+        alpha,
+        request.lower,
+        request.upper,
+    )
+}
+
 fn bounded_step(
     x: &[f64],
     direction: &[f64],
@@ -1397,42 +1541,91 @@ fn direction_with_mode(
     lower: &[f64],
     upper: &[f64],
     history: &[Correction],
-    mode: DirectionMode,
-    min_step: f64,
-) -> Vec<f64> {
-    match mode {
-        DirectionMode::ProjectedLbfgs => {
-            projected_lbfgs_direction(x, gradient, lower, upper, history)
-        }
-        DirectionMode::CauchySubspace => {
-            cauchy_subspace_direction(x, gradient, lower, upper, history, min_step)
-                .unwrap_or_else(|| projected_lbfgs_direction(x, gradient, lower, upper, history))
-        }
+    settings: DirectionSettings,
+) -> DirectionChoice {
+    match settings.mode {
+        DirectionMode::ProjectedLbfgs => DirectionChoice {
+            direction: projected_lbfgs_direction(x, gradient, lower, upper, history),
+            unit_step_target: None,
+            refresh_history: false,
+        },
+        DirectionMode::CauchySubspace => cauchy_subspace_direction(
+            x,
+            gradient,
+            lower,
+            upper,
+            history,
+            settings.bound_activity,
+            settings.min_step,
+        )
+        .unwrap_or_else(|| DirectionChoice {
+            direction: projected_lbfgs_direction(x, gradient, lower, upper, history),
+            unit_step_target: None,
+            refresh_history: false,
+        }),
         #[cfg(test)]
-        DirectionMode::CauchySubspaceCappedFirstStep => {
-            cauchy_subspace_direction(x, gradient, lower, upper, history, min_step)
-                .unwrap_or_else(|| projected_lbfgs_direction(x, gradient, lower, upper, history))
-        }
+        DirectionMode::CauchySubspaceCappedFirstStep => cauchy_subspace_direction(
+            x,
+            gradient,
+            lower,
+            upper,
+            history,
+            settings.bound_activity,
+            settings.min_step,
+        )
+        .unwrap_or_else(|| DirectionChoice {
+            direction: projected_lbfgs_direction(x, gradient, lower, upper, history),
+            unit_step_target: None,
+            refresh_history: false,
+        }),
         #[cfg(test)]
         DirectionMode::CauchyFirstThenProjected => {
             if history.is_empty() {
-                cauchy_subspace_direction(x, gradient, lower, upper, history, min_step)
-                    .unwrap_or_else(|| {
-                        projected_lbfgs_direction(x, gradient, lower, upper, history)
-                    })
+                cauchy_subspace_direction(
+                    x,
+                    gradient,
+                    lower,
+                    upper,
+                    history,
+                    settings.bound_activity,
+                    settings.min_step,
+                )
+                .unwrap_or_else(|| DirectionChoice {
+                    direction: projected_lbfgs_direction(x, gradient, lower, upper, history),
+                    unit_step_target: None,
+                    refresh_history: false,
+                })
             } else {
-                projected_lbfgs_direction(x, gradient, lower, upper, history)
+                DirectionChoice {
+                    direction: projected_lbfgs_direction(x, gradient, lower, upper, history),
+                    unit_step_target: None,
+                    refresh_history: false,
+                }
             }
         }
         #[cfg(test)]
         DirectionMode::CauchyFirstThenProjectedCapped => {
             if history.is_empty() {
-                cauchy_subspace_direction(x, gradient, lower, upper, history, min_step)
-                    .unwrap_or_else(|| {
-                        projected_lbfgs_direction(x, gradient, lower, upper, history)
-                    })
+                cauchy_subspace_direction(
+                    x,
+                    gradient,
+                    lower,
+                    upper,
+                    history,
+                    settings.bound_activity,
+                    settings.min_step,
+                )
+                .unwrap_or_else(|| DirectionChoice {
+                    direction: projected_lbfgs_direction(x, gradient, lower, upper, history),
+                    unit_step_target: None,
+                    refresh_history: false,
+                })
             } else {
-                projected_lbfgs_direction(x, gradient, lower, upper, history)
+                DirectionChoice {
+                    direction: projected_lbfgs_direction(x, gradient, lower, upper, history),
+                    unit_step_target: None,
+                    refresh_history: false,
+                }
             }
         }
     }
@@ -1444,18 +1637,83 @@ fn cauchy_subspace_direction(
     lower: &[f64],
     upper: &[f64],
     history: &[Correction],
+    bound_activity: BoundActivity,
     min_step: f64,
-) -> Option<Vec<f64>> {
-    let cauchy = generalized_cauchy_point_limited_memory(x, gradient, lower, upper, history);
-    let target = subspace_minimizer_limited_memory(x, gradient, lower, upper, history, &cauchy)
-        .map(|point| point.x)
-        .unwrap_or(cauchy.x);
+) -> Option<DirectionChoice> {
+    let cauchy = generalized_cauchy_point_limited_memory_with_activity(
+        x,
+        gradient,
+        lower,
+        upper,
+        history,
+        bound_activity,
+    );
+    let target = subspace_minimizer_limited_memory_with_activity(
+        x,
+        gradient,
+        lower,
+        upper,
+        history,
+        &cauchy,
+        bound_activity,
+    )
+    .map(|point| point.x)
+    .unwrap_or_else(|| cauchy.x.clone());
     let direction = difference(&target, x);
     if norm_inf(&direction) <= min_step {
         None
     } else {
-        Some(direction)
+        Some(DirectionChoice {
+            refresh_history: should_refresh_history_for_subspace(x, &cauchy.x, &target, history),
+            direction,
+            unit_step_target: exact_bound_unit_step_target(&target, lower, upper, bound_activity),
+        })
     }
+}
+
+fn exact_bound_unit_step_target(
+    target: &[f64],
+    lower: &[f64],
+    upper: &[f64],
+    bound_activity: BoundActivity,
+) -> Option<Vec<f64>> {
+    if bound_activity != BoundActivity::Exact {
+        return None;
+    }
+    // R's line search copies z exactly when stp == 1. Keep this exact-copy
+    // parity to smaller finite-box subspace targets where the dense clean-room
+    // model is already close to R's compact arithmetic; larger flat-tail
+    // hard-real cases are more stable with recomputed x + d until that compact
+    // subspace arithmetic is matched more closely.
+    if target.len() > EXACT_BOUND_UNIT_STEP_MAX_DIMENSION {
+        return None;
+    }
+
+    target
+        .iter()
+        .zip(lower.iter())
+        .zip(upper.iter())
+        .any(|((&value, &lower), &upper)| {
+            (lower.is_finite() && value == lower) || (upper.is_finite() && value == upper)
+        })
+        .then(|| target.to_vec())
+}
+
+fn should_refresh_history_for_subspace(
+    x: &[f64],
+    cauchy: &[f64],
+    target: &[f64],
+    history: &[Correction],
+) -> bool {
+    // R's bundled L-BFGS-B 2.3 can discard memory after a compact subspace
+    // factorization failure. This clean-room guard catches the same early
+    // explosive subspace step shape seen in hard-real objective-only traces.
+    if history.len() != 3 {
+        return false;
+    }
+    let cauchy_step = norm_inf(&difference(cauchy, x));
+    let subspace_step = norm_inf(&difference(target, x));
+    subspace_step > SUBSPACE_REFRESH_STEP_RATIO * cauchy_step.max(MIN_STEP)
 }
 
 fn lbfgs_inverse_product(vector: &[f64], history: &[Correction]) -> Vec<f64> {
@@ -1593,7 +1851,14 @@ fn generalized_cauchy_point_identity(
     lower: &[f64],
     upper: &[f64],
 ) -> CauchyPoint {
-    generalized_cauchy_point_with_hessian(x, gradient, lower, upper, |vector| vector.to_vec())
+    generalized_cauchy_point_with_hessian(
+        x,
+        gradient,
+        lower,
+        upper,
+        |vector| vector.to_vec(),
+        BoundActivity::Tolerant,
+    )
 }
 
 fn generalized_cauchy_point_limited_memory(
@@ -1603,9 +1868,32 @@ fn generalized_cauchy_point_limited_memory(
     upper: &[f64],
     history: &[Correction],
 ) -> CauchyPoint {
-    generalized_cauchy_point_with_hessian(x, gradient, lower, upper, |vector| {
-        lbfgs_hessian_product(vector, history)
-    })
+    generalized_cauchy_point_limited_memory_with_activity(
+        x,
+        gradient,
+        lower,
+        upper,
+        history,
+        BoundActivity::Tolerant,
+    )
+}
+
+fn generalized_cauchy_point_limited_memory_with_activity(
+    x: &[f64],
+    gradient: &[f64],
+    lower: &[f64],
+    upper: &[f64],
+    history: &[Correction],
+    bound_activity: BoundActivity,
+) -> CauchyPoint {
+    generalized_cauchy_point_with_hessian(
+        x,
+        gradient,
+        lower,
+        upper,
+        |vector| lbfgs_hessian_product(vector, history),
+        bound_activity,
+    )
 }
 
 fn generalized_cauchy_point_with_hessian<F>(
@@ -1614,6 +1902,7 @@ fn generalized_cauchy_point_with_hessian<F>(
     lower: &[f64],
     upper: &[f64],
     mut hessian_product: F,
+    bound_activity: BoundActivity,
 ) -> CauchyPoint
 where
     F: FnMut(&[f64]) -> Vec<f64>,
@@ -1651,7 +1940,7 @@ where
         let direction = cauchy_path_direction(gradient, &free);
         if norm_inf(&direction) <= MIN_STEP {
             return CauchyPoint {
-                active_count: active_count(&point, lower, upper),
+                active_count: active_count_with_activity(&point, lower, upper, bound_activity),
                 x: point,
             };
         }
@@ -1666,7 +1955,7 @@ where
 
         if derivative >= 0.0 {
             return CauchyPoint {
-                active_count: active_count(&point, lower, upper),
+                active_count: active_count_with_activity(&point, lower, upper, bound_activity),
                 x: point,
             };
         }
@@ -1682,7 +1971,7 @@ where
             if stationary_interval <= interval {
                 advance_cauchy_point(&mut point, &direction, stationary_interval, lower, upper);
                 return CauchyPoint {
-                    active_count: active_count(&point, lower, upper),
+                    active_count: active_count_with_activity(&point, lower, upper, bound_activity),
                     x: point,
                 };
             }
@@ -1690,7 +1979,7 @@ where
 
         if !next_time.is_finite() {
             return CauchyPoint {
-                active_count: active_count(&point, lower, upper),
+                active_count: active_count_with_activity(&point, lower, upper, bound_activity),
                 x: point,
             };
         }
@@ -1730,20 +2019,35 @@ fn advance_cauchy_point(
     }
 }
 
-fn active_count(point: &[f64], lower: &[f64], upper: &[f64]) -> usize {
+fn active_count_with_activity(
+    point: &[f64],
+    lower: &[f64],
+    upper: &[f64],
+    bound_activity: BoundActivity,
+) -> usize {
     let mut count = 0;
     for index in 0..point.len() {
-        if is_active_at_bound(point[index], lower[index], upper[index]) {
+        if is_active_at_bound(point[index], lower[index], upper[index], bound_activity) {
             count += 1;
         }
     }
     count
 }
 
-fn is_active_at_bound(value: f64, lower: f64, upper: f64) -> bool {
-    lower == upper
-        || (value <= lower + BOUND_TOL && lower.is_finite())
-        || (value >= upper - BOUND_TOL && upper.is_finite())
+fn is_active_at_bound(value: f64, lower: f64, upper: f64, bound_activity: BoundActivity) -> bool {
+    if lower == upper {
+        return true;
+    }
+
+    match bound_activity {
+        BoundActivity::Tolerant => {
+            (value <= lower + BOUND_TOL && lower.is_finite())
+                || (value >= upper - BOUND_TOL && upper.is_finite())
+        }
+        BoundActivity::Exact => {
+            (value <= lower && lower.is_finite()) || (value >= upper && upper.is_finite())
+        }
+    }
 }
 
 fn subspace_minimizer_limited_memory(
@@ -1754,11 +2058,406 @@ fn subspace_minimizer_limited_memory(
     history: &[Correction],
     cauchy: &CauchyPoint,
 ) -> Option<SubspacePoint> {
-    subspace_minimizer_with_hessian(x, gradient, lower, upper, cauchy, |vector| {
-        lbfgs_hessian_product(vector, history)
+    subspace_minimizer_limited_memory_with_activity(
+        x,
+        gradient,
+        lower,
+        upper,
+        history,
+        cauchy,
+        BoundActivity::Tolerant,
+    )
+}
+
+fn subspace_minimizer_limited_memory_with_activity(
+    x: &[f64],
+    gradient: &[f64],
+    lower: &[f64],
+    upper: &[f64],
+    history: &[Correction],
+    cauchy: &CauchyPoint,
+    bound_activity: BoundActivity,
+) -> Option<SubspacePoint> {
+    if bound_activity == BoundActivity::Exact
+        && !history.is_empty()
+        && x.len() <= R23_COMPACT_SUBSPACE_MAX_DIMENSION
+    {
+        if let Some(point) = compact_subspace_minimizer_r23(
+            x,
+            gradient,
+            lower,
+            upper,
+            history,
+            cauchy,
+            bound_activity,
+        ) {
+            return Some(point);
+        }
+    }
+
+    subspace_minimizer_with_hessian_and_activity(
+        x,
+        gradient,
+        lower,
+        upper,
+        cauchy,
+        bound_activity,
+        |vector| lbfgs_hessian_product(vector, history),
+    )
+}
+
+fn compact_subspace_minimizer_r23(
+    x: &[f64],
+    gradient: &[f64],
+    lower: &[f64],
+    upper: &[f64],
+    history: &[Correction],
+    cauchy: &CauchyPoint,
+    bound_activity: BoundActivity,
+) -> Option<SubspacePoint> {
+    let free_indices = free_indices_with_activity(&cauchy.x, lower, upper, bound_activity);
+    if free_indices.is_empty() {
+        return Some(SubspacePoint {
+            x: cauchy.x.clone(),
+            free_count: 0,
+            clipped: false,
+        });
+    }
+
+    let free_mask = index_mask(x.len(), &free_indices);
+    let active_indices: Vec<usize> = (0..x.len()).filter(|&index| !free_mask[index]).collect();
+    let compact = CompactMatrices::new(history)?;
+    let displacement = difference(&cauchy.x, x);
+    let cauchy_middle = compact.middle_product(&compact.w_transpose(&displacement))?;
+    let mut reduced = Vec::with_capacity(free_indices.len());
+    for &index in &free_indices {
+        reduced.push(-compact.theta * displacement[index] - gradient[index]);
+    }
+
+    for (correction_index, correction) in history.iter().enumerate() {
+        let a1 = cauchy_middle[correction_index];
+        let a2 = compact.theta * cauchy_middle[history.len() + correction_index];
+        for (slot, &index) in free_indices.iter().enumerate() {
+            reduced[slot] += correction.y[index] * a1 + correction.s[index] * a2;
+        }
+    }
+
+    let wn = compact.form_subspace_factor(&free_indices, &active_indices)?;
+    let mut wv = vec![0.0; 2 * history.len()];
+    for (correction_index, correction) in history.iter().enumerate() {
+        let mut y_dot = 0.0;
+        let mut s_dot = 0.0;
+        for (slot, &index) in free_indices.iter().enumerate() {
+            y_dot += correction.y[index] * reduced[slot];
+            s_dot += correction.s[index] * reduced[slot];
+        }
+        wv[correction_index] = y_dot;
+        wv[history.len() + correction_index] = compact.theta * s_dot;
+    }
+
+    solve_upper_transpose_in_place(&wn, 0, wv.len(), &mut wv)?;
+    for value in wv.iter_mut().take(history.len()) {
+        *value = -*value;
+    }
+    solve_upper_in_place(&wn, 0, wv.len(), &mut wv)?;
+
+    let mut reduced_step = reduced;
+    for (correction_index, correction) in history.iter().enumerate() {
+        let s_slot = history.len() + correction_index;
+        for (slot, &index) in free_indices.iter().enumerate() {
+            reduced_step[slot] += correction.y[index] * wv[correction_index] / compact.theta
+                + correction.s[index] * wv[s_slot];
+        }
+    }
+    for step in &mut reduced_step {
+        *step /= compact.theta;
+    }
+
+    let mut alpha = 1.0;
+    let mut candidate_alpha = alpha;
+    let mut boundary_slot = None;
+    for (slot, &index) in free_indices.iter().enumerate() {
+        let step = reduced_step[slot];
+        if lower[index].is_finite() && step < 0.0 {
+            let room = lower[index] - cauchy.x[index];
+            if room >= 0.0 {
+                candidate_alpha = 0.0;
+            } else if step * alpha < room {
+                candidate_alpha = room / step;
+            }
+        } else if upper[index].is_finite() && step > 0.0 {
+            let room = upper[index] - cauchy.x[index];
+            if room <= 0.0 {
+                candidate_alpha = 0.0;
+            } else if step * alpha > room {
+                candidate_alpha = room / step;
+            }
+        }
+        if candidate_alpha < alpha {
+            alpha = candidate_alpha;
+            boundary_slot = Some(slot);
+        }
+    }
+
+    let mut point = cauchy.x.clone();
+    if alpha < 1.0 {
+        if let Some(slot) = boundary_slot {
+            let index = free_indices[slot];
+            if reduced_step[slot] > 0.0 {
+                point[index] = upper[index];
+                reduced_step[slot] = 0.0;
+            } else if reduced_step[slot] < 0.0 {
+                point[index] = lower[index];
+                reduced_step[slot] = 0.0;
+            }
+        }
+    }
+    for (slot, &index) in free_indices.iter().enumerate() {
+        point[index] += alpha * reduced_step[slot];
+    }
+
+    Some(SubspacePoint {
+        x: point,
+        free_count: free_indices.len(),
+        clipped: alpha < 1.0,
     })
 }
 
+#[derive(Debug)]
+struct CompactMatrices {
+    theta: f64,
+    sy: Vec<Vec<f64>>,
+    wt: Vec<Vec<f64>>,
+    history: Vec<Correction>,
+}
+
+impl CompactMatrices {
+    fn new(history: &[Correction]) -> Option<Self> {
+        let last = history.last()?;
+        let sy_last = dot(&last.s, &last.y);
+        let yy_last = dot(&last.y, &last.y);
+        if sy_last <= 0.0 || !sy_last.is_finite() || !yy_last.is_finite() {
+            return None;
+        }
+        let theta = (yy_last / sy_last).max(1e-20);
+        let col = history.len();
+        let mut sy = vec![vec![0.0; col]; col];
+        let mut ss = vec![vec![0.0; col]; col];
+        for (row, row_correction) in history.iter().enumerate() {
+            for (column, column_correction) in history.iter().enumerate() {
+                sy[row][column] = dot(&row_correction.s, &column_correction.y);
+                ss[row][column] = dot(&row_correction.s, &column_correction.s);
+            }
+        }
+        let wt = form_compact_wt(theta, &sy, &ss)?;
+        Some(Self {
+            theta,
+            sy,
+            wt,
+            history: history.to_vec(),
+        })
+    }
+
+    fn w_transpose(&self, vector: &[f64]) -> Vec<f64> {
+        let col = self.history.len();
+        let mut result = vec![0.0; 2 * col];
+        for (slot, correction) in self.history.iter().enumerate() {
+            result[slot] = dot(&correction.y, vector);
+            result[col + slot] = self.theta * dot(&correction.s, vector);
+        }
+        result
+    }
+
+    fn middle_product(&self, vector: &[f64]) -> Option<Vec<f64>> {
+        compact_middle_product(&self.sy, &self.wt, vector)
+    }
+
+    fn form_subspace_factor(
+        &self,
+        free_indices: &[usize],
+        active_indices: &[usize],
+    ) -> Option<Vec<Vec<f64>>> {
+        let col = self.history.len();
+        let col2 = 2 * col;
+        let mut wn = vec![vec![0.0; col2]; col2];
+
+        for row in 0..col {
+            let row_correction = &self.history[row];
+            let bottom_row = col + row;
+            for column in 0..=row {
+                let column_correction = &self.history[column];
+                let bottom_column = col + column;
+                wn[column][row] =
+                    dot_on_indices(&row_correction.y, &column_correction.y, free_indices)
+                        / self.theta;
+                wn[bottom_column][bottom_row] =
+                    dot_on_indices(&row_correction.s, &column_correction.s, active_indices)
+                        * self.theta;
+            }
+
+            for (column, column_correction) in self.history.iter().enumerate().take(row) {
+                wn[column][bottom_row] =
+                    -dot_on_indices(&row_correction.s, &column_correction.y, active_indices);
+            }
+            for (column, column_correction) in self.history.iter().enumerate().take(col).skip(row) {
+                wn[column][bottom_row] =
+                    dot_on_indices(&row_correction.s, &column_correction.y, free_indices);
+            }
+            wn[row][row] += self.sy[row][row];
+        }
+
+        cholesky_upper_in_place(&mut wn, 0, col)?;
+        for column in col..col2 {
+            let mut rhs: Vec<f64> = (0..col).map(|row| wn[row][column]).collect();
+            solve_upper_transpose_in_place(&wn, 0, col, &mut rhs)?;
+            for row in 0..col {
+                wn[row][column] = rhs[row];
+            }
+        }
+        for row in col..col2 {
+            for column in row..col2 {
+                let update = (0..col)
+                    .map(|index| wn[index][row] * wn[index][column])
+                    .sum::<f64>();
+                wn[row][column] += update;
+            }
+        }
+        cholesky_upper_in_place(&mut wn, col, col)?;
+        Some(wn)
+    }
+}
+
+fn form_compact_wt(theta: f64, sy: &[Vec<f64>], ss: &[Vec<f64>]) -> Option<Vec<Vec<f64>>> {
+    let col = sy.len();
+    let mut wt = vec![vec![0.0; col]; col];
+    for column in 0..col {
+        wt[0][column] = theta * ss[0][column];
+    }
+    for row in 1..col {
+        for column in row..col {
+            let update = (0..row)
+                .map(|index| sy[row][index] * sy[column][index] / sy[index][index])
+                .sum::<f64>();
+            wt[row][column] = update + theta * ss[row][column];
+        }
+    }
+    cholesky_upper_in_place(&mut wt, 0, col)?;
+    Some(wt)
+}
+
+fn compact_middle_product(sy: &[Vec<f64>], wt: &[Vec<f64>], vector: &[f64]) -> Option<Vec<f64>> {
+    let col = sy.len();
+    if vector.len() != 2 * col {
+        return None;
+    }
+    let mut product = vec![0.0; 2 * col];
+    product[col] = vector[col];
+    for row in 1..col {
+        let update = (0..row)
+            .map(|index| sy[row][index] * vector[index] / sy[index][index])
+            .sum::<f64>();
+        product[col + row] = vector[col + row] + update;
+    }
+    solve_upper_transpose_in_place(wt, 0, col, &mut product[col..])?;
+    for index in 0..col {
+        product[index] = vector[index] / sy[index][index].sqrt();
+    }
+    solve_upper_in_place(wt, 0, col, &mut product[col..])?;
+    for index in 0..col {
+        product[index] = -product[index] / sy[index][index].sqrt();
+    }
+    for index in 0..col {
+        let update = (index + 1..col)
+            .map(|row| sy[row][index] * product[col + row] / sy[index][index])
+            .sum::<f64>();
+        product[index] += update;
+    }
+    Some(product)
+}
+
+fn cholesky_upper_in_place(matrix: &mut [Vec<f64>], offset: usize, dimension: usize) -> Option<()> {
+    for column in 0..dimension {
+        for row in 0..=column {
+            let mut value = matrix[offset + row][offset + column];
+            for index in 0..row {
+                value -=
+                    matrix[offset + index][offset + row] * matrix[offset + index][offset + column];
+            }
+            if row == column {
+                if value <= CURVATURE_EPS || !value.is_finite() {
+                    return None;
+                }
+                matrix[offset + row][offset + column] = value.sqrt();
+            } else {
+                matrix[offset + row][offset + column] = value / matrix[offset + row][offset + row];
+            }
+        }
+    }
+    Some(())
+}
+
+fn solve_upper_transpose_in_place(
+    upper: &[Vec<f64>],
+    offset: usize,
+    dimension: usize,
+    rhs: &mut [f64],
+) -> Option<()> {
+    if rhs.len() != dimension {
+        return None;
+    }
+    for row in 0..dimension {
+        let mut value = rhs[row];
+        for (column, &solution) in rhs.iter().take(row).enumerate() {
+            value -= upper[offset + column][offset + row] * solution;
+        }
+        let diagonal = upper[offset + row][offset + row];
+        if diagonal == 0.0 || !diagonal.is_finite() {
+            return None;
+        }
+        rhs[row] = value / diagonal;
+    }
+    Some(())
+}
+
+fn solve_upper_in_place(
+    upper: &[Vec<f64>],
+    offset: usize,
+    dimension: usize,
+    rhs: &mut [f64],
+) -> Option<()> {
+    if rhs.len() != dimension {
+        return None;
+    }
+    for row in (0..dimension).rev() {
+        let mut value = rhs[row];
+        for column in row + 1..dimension {
+            value -= upper[offset + row][offset + column] * rhs[column];
+        }
+        let diagonal = upper[offset + row][offset + row];
+        if diagonal == 0.0 || !diagonal.is_finite() {
+            return None;
+        }
+        rhs[row] = value / diagonal;
+    }
+    Some(())
+}
+
+fn index_mask(dimension: usize, indices: &[usize]) -> Vec<bool> {
+    let mut mask = vec![false; dimension];
+    for &index in indices {
+        mask[index] = true;
+    }
+    mask
+}
+
+fn dot_on_indices(left: &[f64], right: &[f64], indices: &[usize]) -> f64 {
+    indices
+        .iter()
+        .map(|&index| left[index] * right[index])
+        .sum()
+}
+
+#[cfg(test)]
 fn subspace_minimizer_with_hessian<F>(
     x: &[f64],
     gradient: &[f64],
@@ -1770,7 +2469,30 @@ fn subspace_minimizer_with_hessian<F>(
 where
     F: FnMut(&[f64]) -> Vec<f64>,
 {
-    let free_indices = free_indices(&cauchy.x, lower, upper);
+    subspace_minimizer_with_hessian_and_activity(
+        x,
+        gradient,
+        lower,
+        upper,
+        cauchy,
+        BoundActivity::Tolerant,
+        &mut hessian_product,
+    )
+}
+
+fn subspace_minimizer_with_hessian_and_activity<F>(
+    x: &[f64],
+    gradient: &[f64],
+    lower: &[f64],
+    upper: &[f64],
+    cauchy: &CauchyPoint,
+    bound_activity: BoundActivity,
+    mut hessian_product: F,
+) -> Option<SubspacePoint>
+where
+    F: FnMut(&[f64]) -> Vec<f64>,
+{
+    let free_indices = free_indices_with_activity(&cauchy.x, lower, upper, bound_activity);
     if free_indices.is_empty() {
         return Some(SubspacePoint {
             x: cauchy.x.clone(),
@@ -1804,9 +2526,16 @@ where
     })
 }
 
-fn free_indices(point: &[f64], lower: &[f64], upper: &[f64]) -> Vec<usize> {
+fn free_indices_with_activity(
+    point: &[f64],
+    lower: &[f64],
+    upper: &[f64],
+    bound_activity: BoundActivity,
+) -> Vec<usize> {
     (0..point.len())
-        .filter(|&index| !is_active_at_bound(point[index], lower[index], upper[index]))
+        .filter(|&index| {
+            !is_active_at_bound(point[index], lower[index], upper[index], bound_activity)
+        })
         .collect()
 }
 
@@ -1887,17 +2616,26 @@ fn solve_positive_definite(matrix: Vec<Vec<f64>>, rhs: Vec<f64>) -> Option<Vec<f
 fn projected_gradient_norm(x: &[f64], gradient: &[f64], lower: &[f64], upper: &[f64]) -> f64 {
     let mut max_norm: f64 = 0.0;
     for index in 0..x.len() {
-        let fixed = lower[index] == upper[index];
-        let lower_is_optimal = x[index] <= lower[index] + BOUND_TOL && gradient[index] >= 0.0;
-        let upper_is_optimal = x[index] >= upper[index] - BOUND_TOL && gradient[index] <= 0.0;
-        let component = if fixed || lower_is_optimal || upper_is_optimal {
-            0.0
-        } else {
-            gradient[index]
-        };
+        let mut component = gradient[index];
+        if component < 0.0 && upper[index].is_finite() {
+            component = component.max(x[index] - upper[index]);
+        } else if component > 0.0 && lower[index].is_finite() {
+            component = component.min(x[index] - lower[index]);
+        }
         max_norm = max_norm.max(component.abs());
     }
     max_norm
+}
+
+fn relative_objective_reduction(previous: f64, current: f64) -> f64 {
+    (previous - current) / previous.abs().max(current.abs()).max(1.0)
+}
+
+fn should_restart_after_line_search_failure(
+    history: &[Correction],
+    already_restarted_this_iteration: bool,
+) -> bool {
+    !already_restarted_this_iteration && !history.is_empty()
 }
 
 fn update_history(
@@ -1960,13 +2698,14 @@ fn norm2(x: &[f64]) -> f64 {
 fn maybe_trace(
     iteration: usize,
     value: f64,
+    relative_reduction: f64,
     projected_norm: f64,
     step: &Step,
     control: BackendControl,
 ) {
     if control.trace > 0 && control.report > 0 && iteration.is_multiple_of(control.report) {
         eprintln!(
-            "iter={iteration} f={value:.6e} ||proj_grad||_inf={projected_norm:.3e} line_search={} alpha={:.6e} max_alpha={:.6e} step_norm={:.6e} wolfe_curv={} curvature_ratio={:.3e}",
+            "iter={iteration} f={value:.6e} rel_red={relative_reduction:.3e} ||proj_grad||_inf={projected_norm:.3e} line_search={} alpha={:.6e} max_alpha={:.6e} step_norm={:.6e} wolfe_curv={} curvature_ratio={:.3e}",
             step.line_search_trials,
             step.alpha,
             step.max_alpha,
@@ -2059,6 +2798,38 @@ mod tests {
     }
 
     #[test]
+    fn relative_reduction_uses_signed_decrease_like_r() {
+        assert!((relative_objective_reduction(10.0, 9.0) - 0.1).abs() <= 1e-15);
+        assert!((relative_objective_reduction(10.0, 10.5) + (0.5 / 10.5)).abs() <= 1e-15);
+        assert!((relative_objective_reduction(0.25, 0.5) + 0.25).abs() <= 1e-15);
+    }
+
+    #[test]
+    fn projected_gradient_norm_caps_components_by_bound_distance_like_r() {
+        let norm = projected_gradient_norm(
+            &[0.99, -1.99, 0.0, 2.0],
+            &[-10.0, 8.0, 0.005, -3.0],
+            &[-1.0, -2.0, f64::NEG_INFINITY, 2.0],
+            &[1.0, 3.0, f64::INFINITY, 2.0],
+        );
+
+        assert!((norm - 0.01).abs() <= 1e-15);
+    }
+
+    #[test]
+    fn line_search_failure_restart_requires_existing_history_once() {
+        let history = vec![Correction {
+            s: vec![1.0],
+            y: vec![1.0],
+            rho: 1.0,
+        }];
+
+        assert!(should_restart_after_line_search_failure(&history, false));
+        assert!(!should_restart_after_line_search_failure(&history, true));
+        assert!(!should_restart_after_line_search_failure(&[], false));
+    }
+
+    #[test]
     fn project_direction_keeps_free_quasi_newton_components() {
         let mut direction = vec![1.0, -2.0];
         project_direction(
@@ -2080,6 +2851,70 @@ mod tests {
             &mut direction,
         );
         assert_eq!(direction, vec![0.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn project_direction_blocks_outward_components_with_roundoff_tolerance() {
+        let mut direction = vec![-1.0, 2.0];
+        project_direction(
+            &[4.0e-16, 1.0 - 4.0e-16],
+            &[0.0, 0.0],
+            &[1.0, 1.0],
+            &mut direction,
+        );
+
+        assert_eq!(direction, vec![0.0, 0.0]);
+    }
+
+    #[test]
+    fn subspace_free_set_requires_exact_bound_hit() {
+        let lower = vec![0.0, 0.0, 0.0, 0.0];
+        let upper = vec![1.0, 1.0, 1.0, 1.0];
+        let point = vec![4.0e-16, 1.0 - 4.0e-16, 0.0, 1.0];
+
+        assert_eq!(
+            free_indices_with_activity(&point, &lower, &upper, BoundActivity::Exact),
+            vec![0, 1]
+        );
+        assert_eq!(
+            active_count_with_activity(&point, &lower, &upper, BoundActivity::Exact),
+            2
+        );
+    }
+
+    #[test]
+    fn exact_bound_activity_is_limited_to_objective_only_finite_boxes() {
+        let objective_only = BackendControl {
+            has_user_gradient: false,
+            maxit: 100,
+            factr: 1e7,
+            pgtol: 0.0,
+            lmm: 5,
+            trace: 0,
+            report: 10,
+        };
+        let supplied_gradient = BackendControl {
+            has_user_gradient: true,
+            maxit: 100,
+            factr: 1e7,
+            pgtol: 0.0,
+            lmm: 5,
+            trace: 0,
+            report: 10,
+        };
+
+        assert_eq!(
+            BoundActivity::for_problem(objective_only, 2, &[0.0, 0.0], &[1.0, 1.0]),
+            BoundActivity::Exact
+        );
+        assert_eq!(
+            BoundActivity::for_problem(supplied_gradient, 2, &[0.0, 0.0], &[1.0, 1.0]),
+            BoundActivity::Tolerant
+        );
+        assert_eq!(
+            BoundActivity::for_problem(objective_only, 2, &[f64::NEG_INFINITY, 0.0], &[1.0, 1.0]),
+            BoundActivity::Tolerant
+        );
     }
 
     #[test]
@@ -2117,6 +2952,14 @@ mod tests {
         assert!(!more_thuente_enters_stage_two(true, 0.0, 0.0, -1e-12));
         assert!(more_thuente_enters_stage_two(true, 0.0, 0.0, 0.0));
         assert!(!more_thuente_enters_stage_two(false, 0.0, 0.0, 1.0));
+    }
+
+    #[test]
+    fn more_thuente_retry_warning_requires_narrow_bracket() {
+        assert!(more_thuente_retry_warning(10.0, 14.9, true));
+        assert!(!more_thuente_retry_warning(10.0, 21.0, true));
+        assert!(!more_thuente_retry_warning(10.0, 14.9, false));
+        assert!(!more_thuente_retry_warning(0.0, 0.0, true));
     }
 
     #[test]
@@ -2350,6 +3193,37 @@ mod tests {
     }
 
     #[test]
+    fn subspace_refresh_guard_requires_three_corrections_and_large_step_ratio() {
+        let history = vec![
+            Correction {
+                s: vec![1.0],
+                y: vec![1.0],
+                rho: 1.0,
+            };
+            3
+        ];
+
+        assert!(should_refresh_history_for_subspace(
+            &[0.0],
+            &[1.0],
+            &[71.0],
+            &history
+        ));
+        assert!(!should_refresh_history_for_subspace(
+            &[0.0],
+            &[1.0],
+            &[69.0],
+            &history
+        ));
+        assert!(!should_refresh_history_for_subspace(
+            &[0.0],
+            &[1.0],
+            &[71.0],
+            &history[..2]
+        ));
+    }
+
+    #[test]
     fn subspace_minimizer_solves_free_block_after_cauchy_point() {
         let cauchy = CauchyPoint {
             x: vec![-0.5, 1.0],
@@ -2426,12 +3300,14 @@ mod tests {
                 value: 4.0,
                 gradient: &[-4.0],
                 direction: &[1.0],
+                unit_step_target: None,
                 lower: &[f64::NEG_INFINITY],
                 upper: &[f64::INFINITY],
                 max_step_cap: None,
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
+                allow_retry_warning_accept: false,
                 min_step: MIN_STEP,
                 quadratic_interpolation_damping: INTERPOLATION_DAMPING,
             },
@@ -2452,6 +3328,57 @@ mod tests {
     }
 
     #[test]
+    fn line_search_candidate_copies_exact_unit_step_target() {
+        let x = [-25.060655267031027];
+        let target = [30.0];
+        let direction = [target[0] - x[0]];
+        let recomputed = bounded_step(&x, &direction, 1.0, &[-30.0], &[30.0]);
+        assert_ne!(recomputed[0].to_bits(), target[0].to_bits());
+
+        let candidate = line_search_candidate(
+            &LineSearchRequest {
+                x: &x,
+                value: 0.0,
+                gradient: &[-1.0],
+                direction: &direction,
+                unit_step_target: Some(&target),
+                lower: &[-30.0],
+                upper: &[30.0],
+                max_step_cap: None,
+                cap_initial_unbounded_step: false,
+                initial_step_cap: None,
+                allow_quadratic_interpolation: false,
+                allow_retry_warning_accept: false,
+                min_step: MAIN_PATH_MIN_STEP,
+                quadratic_interpolation_damping: INTERPOLATION_DAMPING,
+            },
+            1.0,
+        );
+
+        assert_eq!(candidate[0].to_bits(), target[0].to_bits());
+    }
+
+    #[test]
+    fn exact_bound_unit_step_target_ignores_interior_targets() {
+        assert_eq!(
+            exact_bound_unit_step_target(&[0.5], &[-1.0], &[1.0], BoundActivity::Exact),
+            None
+        );
+        assert_eq!(
+            exact_bound_unit_step_target(&[1.0], &[-1.0], &[1.0], BoundActivity::Tolerant),
+            None
+        );
+        assert_eq!(
+            exact_bound_unit_step_target(&[1.0], &[-1.0], &[1.0], BoundActivity::Exact),
+            Some(vec![1.0])
+        );
+        assert_eq!(
+            exact_bound_unit_step_target(&[1.0; 10], &[-1.0; 10], &[1.0; 10], BoundActivity::Exact),
+            None
+        );
+    }
+
+    #[test]
     fn line_search_reports_interpolated_trial_after_rejected_full_step() {
         let mut problem = OneDimensionalQuadratic;
         let mut counts = OptimCounts::default();
@@ -2462,12 +3389,14 @@ mod tests {
                 value: 4.0,
                 gradient: &[-4.0],
                 direction: &[10.0],
+                unit_step_target: None,
                 lower: &[f64::NEG_INFINITY],
                 upper: &[f64::INFINITY],
                 max_step_cap: None,
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: true,
+                allow_retry_warning_accept: false,
                 min_step: MIN_STEP,
                 quadratic_interpolation_damping: INTERPOLATION_DAMPING,
             },
@@ -2497,12 +3426,14 @@ mod tests {
                 value: 4.0,
                 gradient: &[-4.0],
                 direction: &[0.1],
+                unit_step_target: None,
                 lower: &[f64::NEG_INFINITY],
                 upper: &[f64::INFINITY],
                 max_step_cap: None,
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
+                allow_retry_warning_accept: false,
                 min_step: MIN_STEP,
                 quadratic_interpolation_damping: INTERPOLATION_DAMPING,
             },
@@ -2531,12 +3462,14 @@ mod tests {
                 value: 0.0,
                 gradient: &[-1.0],
                 direction: &[1.0],
+                unit_step_target: None,
                 lower: &[f64::NEG_INFINITY],
                 upper: &[10.0],
                 max_step_cap: Some(1.0),
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
+                allow_retry_warning_accept: false,
                 min_step: MAIN_PATH_MIN_STEP,
                 quadratic_interpolation_damping: INTERPOLATION_DAMPING,
             },
@@ -2564,12 +3497,14 @@ mod tests {
                 value: 4.0,
                 gradient: &[-4.0],
                 direction: &[0.1],
+                unit_step_target: None,
                 lower: &[f64::NEG_INFINITY],
                 upper: &[1.0],
                 max_step_cap: None,
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
+                allow_retry_warning_accept: false,
                 min_step: MIN_STEP,
                 quadratic_interpolation_damping: INTERPOLATION_DAMPING,
             },
@@ -2598,12 +3533,14 @@ mod tests {
                 value: 4.0,
                 gradient: &[-4.0],
                 direction: &[10.0],
+                unit_step_target: None,
                 lower: &[f64::NEG_INFINITY],
                 upper: &[10.0],
                 max_step_cap: None,
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
+                allow_retry_warning_accept: false,
                 min_step: MIN_STEP,
                 quadratic_interpolation_damping: INTERPOLATION_DAMPING,
             },
@@ -2631,12 +3568,14 @@ mod tests {
                 value: 4.0,
                 gradient: &[-4.0],
                 direction: &[1.0],
+                unit_step_target: None,
                 lower: &[f64::NEG_INFINITY],
                 upper: &[0.1],
                 max_step_cap: None,
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
+                allow_retry_warning_accept: false,
                 min_step: MIN_STEP,
                 quadratic_interpolation_damping: INTERPOLATION_DAMPING,
             },
@@ -2666,12 +3605,14 @@ mod tests {
                 value: 4.0,
                 gradient: &[-4.0],
                 direction: &[1.0],
+                unit_step_target: None,
                 lower: &[f64::NEG_INFINITY],
                 upper: &[f64::INFINITY],
                 max_step_cap: None,
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
+                allow_retry_warning_accept: false,
                 min_step: MIN_STEP,
                 quadratic_interpolation_damping: INTERPOLATION_DAMPING,
             },
@@ -3126,9 +4067,17 @@ mod tests {
             &g2,
         );
 
-        let direction =
-            cauchy_subspace_direction(&x3, &g3, &lower, &upper, &history, MAIN_PATH_MIN_STEP)
-                .expect("fourth iteration model should produce a step");
+        let direction = cauchy_subspace_direction(
+            &x3,
+            &g3,
+            &lower,
+            &upper,
+            &history,
+            BoundActivity::Tolerant,
+            MAIN_PATH_MIN_STEP,
+        )
+        .expect("fourth iteration model should produce a step")
+        .direction;
         let value = problem.value(&x3).expect("Rosenbrock value");
         let mut recording = RecordingRosenbrockProblem::default();
         let mut counts = OptimCounts::default();
@@ -3139,12 +4088,14 @@ mod tests {
                 value,
                 gradient: &g3,
                 direction: &direction,
+                unit_step_target: None,
                 lower: &lower,
                 upper: &upper,
                 max_step_cap: None,
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
+                allow_retry_warning_accept: false,
                 min_step: MAIN_PATH_MIN_STEP,
                 quadratic_interpolation_damping: INTERPOLATION_DAMPING,
             },
@@ -3187,9 +4138,13 @@ mod tests {
             &lower,
             &upper,
             &history,
-            modes.direction,
-            MIN_STEP,
-        );
+            DirectionSettings {
+                mode: modes.direction,
+                bound_activity: BoundActivity::Tolerant,
+                min_step: MIN_STEP,
+            },
+        )
+        .direction;
         let mut counts = OptimCounts::default();
 
         let step = line_search(
@@ -3199,12 +4154,14 @@ mod tests {
                 value,
                 gradient: &gradient,
                 direction: &direction,
+                unit_step_target: None,
                 lower: &lower,
                 upper: &upper,
                 max_step_cap: None,
                 cap_initial_unbounded_step: false,
                 initial_step_cap: initial_step_cap_for_modes(modes, history.is_empty()),
                 allow_quadratic_interpolation: true,
+                allow_retry_warning_accept: false,
                 min_step: MIN_STEP,
                 quadratic_interpolation_damping: INTERPOLATION_DAMPING,
             },
@@ -3248,9 +4205,13 @@ mod tests {
             &lower,
             &upper,
             &history,
-            DirectionMode::CauchySubspace,
-            MAIN_PATH_MIN_STEP,
-        );
+            DirectionSettings {
+                mode: DirectionMode::CauchySubspace,
+                bound_activity: BoundActivity::Tolerant,
+                min_step: MAIN_PATH_MIN_STEP,
+            },
+        )
+        .direction;
 
         let step = line_search_with_mode(
             &mut problem,
@@ -3259,12 +4220,14 @@ mod tests {
                 value,
                 gradient: &gradient,
                 direction: &direction,
+                unit_step_target: None,
                 lower: &lower,
                 upper: &upper,
                 max_step_cap: None,
                 cap_initial_unbounded_step: false,
                 initial_step_cap: None,
                 allow_quadratic_interpolation: false,
+                allow_retry_warning_accept: false,
                 min_step: MAIN_PATH_MIN_STEP,
                 quadratic_interpolation_damping: INTERPOLATION_DAMPING,
             },

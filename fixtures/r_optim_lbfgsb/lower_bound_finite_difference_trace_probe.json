@@ -1,0 +1,28 @@
+{
+  "fixture": "lower_bound_finite_difference_trace_probe",
+  "initial_par": [0, 1],
+  "lower": [0, -1],
+  "upper": [2, 1],
+  "control": {
+    "maxit": 0,
+    "fnscale": 1,
+    "parscale": [1, 1],
+    "ndeps": [0.10000000000000001, 0.10000000000000001],
+    "factr": 10000000,
+    "pgtol": 0,
+    "lmm": 5
+  },
+  "gradient_supplied": false,
+  "result": {
+    "par": [0, -0.99999999999999956],
+    "value": -1.9999999999999991,
+    "counts": {
+      "function": 2,
+      "gradient": 2
+    },
+    "convergence": 1,
+    "message": "NEW_X"
+  },
+  "r_version": "R version 4.4.3 (2025-02-28)",
+  "platform": "x86_64-conda-linux-gnu"
+}

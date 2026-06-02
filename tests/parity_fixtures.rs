@@ -48,6 +48,22 @@ struct FixtureCounts {
 }
 
 #[derive(Debug, Deserialize)]
+struct TraceFixture {
+    fixture: String,
+    source_fixture: String,
+    trace_kind: String,
+    first_points: Vec<Vec<f64>>,
+    result: TraceResult,
+}
+
+#[derive(Debug, Deserialize)]
+struct TraceResult {
+    counts: FixtureCounts,
+    convergence: i32,
+    message: String,
+}
+
+#[derive(Debug, Deserialize)]
 struct ErrorFixture {
     fixture: String,
     #[serde(deserialize_with = "deserialize_f64_vec")]
@@ -87,7 +103,9 @@ fn fixtures_that_are_currently_at_float_noise_match_r() {
         include_str!("../fixtures/r_optim_lbfgsb/initial_outside_bounds.json"),
         include_str!("../fixtures/r_optim_lbfgsb/initial_pos_inf_projected.json"),
         include_str!("../fixtures/r_optim_lbfgsb/initial_neg_inf_projected.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/line_search_refresh_sin_quad.json"),
         include_str!("../fixtures/r_optim_lbfgsb/lower_bounded_finite_difference_2d.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/lower_bound_finite_difference_trace_probe.json"),
         include_str!("../fixtures/r_optim_lbfgsb/mixed_bounds_quadratic.json"),
         include_str!("../fixtures/r_optim_lbfgsb/mixed_bounds_finite_difference_2d.json"),
         include_str!("../fixtures/r_optim_lbfgsb/near_box_finite_difference_2d.json"),
@@ -102,7 +120,9 @@ fn fixtures_that_are_currently_at_float_noise_match_r() {
         include_str!("../fixtures/r_optim_lbfgsb/pgtol_finite_difference_2d.json"),
         include_str!("../fixtures/r_optim_lbfgsb/pgtol_initial_finite_difference_2d.json"),
         include_str!("../fixtures/r_optim_lbfgsb/pgtol_initial.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/pgtol_near_upper_uses_bound_distance.json"),
         include_str!("../fixtures/r_optim_lbfgsb/quadratic.json"),
+        include_str!("../fixtures/r_optim_lbfgsb/rosenbrock_finite_difference_box.json"),
         include_str!("../fixtures/r_optim_lbfgsb/three_dim_box_active.json"),
         include_str!("../fixtures/r_optim_lbfgsb/three_dim_quadratic.json"),
         include_str!("../fixtures/r_optim_lbfgsb/two_dim_parscale_finite_difference.json"),
@@ -159,6 +179,92 @@ fn loose_factr_rosenbrock_fixture_matches_r() {
     .unwrap();
     let result = run_fixture(&fixture);
     assert_fixture_close(&fixture, &result, 1e-6, 1e-8);
+}
+
+#[test]
+fn rosenbrock_finite_difference_box_trace_matches_r_prefix() {
+    let fixture: Fixture = serde_json::from_str(include_str!(
+        "../fixtures/r_optim_lbfgsb/rosenbrock_finite_difference_box.json"
+    ))
+    .unwrap();
+    let trace: TraceFixture = serde_json::from_str(include_str!(
+        "../fixtures/r_optim_lbfgsb/rosenbrock_finite_difference_box_trace.json"
+    ))
+    .unwrap();
+    assert_eq!(trace.fixture, "rosenbrock_finite_difference_box_trace");
+    assert_eq!(trace.source_fixture, fixture.fixture);
+    assert_eq!(trace.trace_kind, "function_evaluation_points");
+
+    let control = control_from_fixture(&fixture.control);
+    let bounds = Bounds::new(fixture.lower.clone(), fixture.upper.clone()).unwrap();
+    let mut calls = Vec::new();
+    let result = optim_lbfgsb(
+        fixture.initial_par.clone(),
+        bounds,
+        |p| {
+            calls.push(p.to_vec());
+            100.0 * (p[1] - p[0] * p[0]).powi(2) + (1.0 - p[0]).powi(2)
+        },
+        control,
+    )
+    .unwrap();
+
+    assert_eq!(result.counts.function, trace.result.counts.function);
+    assert_eq!(result.counts.gradient, trace.result.counts.gradient);
+    assert_eq!(result.convergence, trace.result.convergence);
+    assert_eq!(result.message, trace.result.message);
+    assert!(
+        calls.len() >= trace.first_points.len(),
+        "expected at least {} raw objective calls, got {}",
+        trace.first_points.len(),
+        calls.len()
+    );
+    for (actual, expected) in calls.iter().zip(trace.first_points.iter()) {
+        assert_vec_close(actual, expected, 1e-10);
+    }
+}
+
+#[test]
+fn lower_bound_finite_difference_trace_matches_r_prefix() {
+    let fixture: Fixture = serde_json::from_str(include_str!(
+        "../fixtures/r_optim_lbfgsb/lower_bound_finite_difference_trace_probe.json"
+    ))
+    .unwrap();
+    let trace: TraceFixture = serde_json::from_str(include_str!(
+        "../fixtures/r_optim_lbfgsb/lower_bound_finite_difference_trace.json"
+    ))
+    .unwrap();
+    assert_eq!(trace.fixture, "lower_bound_finite_difference_trace");
+    assert_eq!(trace.source_fixture, fixture.fixture);
+    assert_eq!(trace.trace_kind, "function_evaluation_points");
+
+    let control = control_from_fixture(&fixture.control);
+    let bounds = Bounds::new(fixture.lower.clone(), fixture.upper.clone()).unwrap();
+    let mut calls = Vec::new();
+    let result = optim_lbfgsb(
+        fixture.initial_par.clone(),
+        bounds,
+        |p| {
+            calls.push(p.to_vec());
+            p[0] + 2.0 * p[1]
+        },
+        control,
+    )
+    .unwrap();
+
+    assert_eq!(result.counts.function, trace.result.counts.function);
+    assert_eq!(result.counts.gradient, trace.result.counts.gradient);
+    assert_eq!(result.convergence, trace.result.convergence);
+    assert_eq!(result.message, trace.result.message);
+    assert!(
+        calls.len() >= trace.first_points.len(),
+        "expected at least {} raw objective calls, got {}",
+        trace.first_points.len(),
+        calls.len()
+    );
+    for (actual, expected) in calls.iter().zip(trace.first_points.iter()) {
+        assert_vec_close(actual, expected, 1e-12);
+    }
 }
 
 #[test]
@@ -398,6 +504,14 @@ fn run_fixture(fixture: &Fixture) -> OptimResult {
             control,
         )
         .unwrap(),
+        "pgtol_near_upper_uses_bound_distance" => optim_lbfgsb_with_gradient(
+            fixture.initial_par.clone(),
+            bounds,
+            |p| -10.0 * p[0],
+            |_| vec![-10.0],
+            control,
+        )
+        .unwrap(),
         "pgtol_finite_difference_2d"
         | "pgtol_initial_finite_difference_2d"
         | "maxit_zero_finite_difference_2d"
@@ -405,6 +519,25 @@ fn run_fixture(fixture: &Fixture) -> OptimResult {
             fixture.initial_par.clone(),
             bounds,
             |p| (p[0] - 1.0).powi(2) + (p[1] + 2.0).powi(2),
+            control,
+        )
+        .unwrap(),
+        "lower_bound_finite_difference_trace_probe" => optim_lbfgsb(
+            fixture.initial_par.clone(),
+            bounds,
+            |p| p[0] + 2.0 * p[1],
+            control,
+        )
+        .unwrap(),
+        "line_search_refresh_sin_quad" => optim_lbfgsb(
+            fixture.initial_par.clone(),
+            bounds,
+            |p| {
+                p.iter()
+                    .map(|x| 0.02 * x.powi(2) + (15.0 * x).sin())
+                    .sum::<f64>()
+                    + 0.3 * p.len() as f64 * (7.0 * p.iter().sum::<f64>()).cos()
+            },
             control,
         )
         .unwrap(),
@@ -488,6 +621,13 @@ fn run_fixture(fixture: &Fixture) -> OptimResult {
             control,
         )
         .unwrap(),
+        "rosenbrock_finite_difference_box" => optim_lbfgsb(
+            fixture.initial_par.clone(),
+            bounds,
+            |p| 100.0 * (p[1] - p[0] * p[0]).powi(2) + (1.0 - p[0]).powi(2),
+            control,
+        )
+        .unwrap(),
         "rosenbrock"
         | "factr_loose_rosenbrock"
         | "lmm_one_rosenbrock"
@@ -563,6 +703,16 @@ fn assert_fixture_close(
         result.value,
         fixture.result.value
     );
+}
+
+fn assert_vec_close(actual: &[f64], expected: &[f64], tolerance: f64) {
+    assert_eq!(actual.len(), expected.len());
+    for (index, (&actual, &expected)) in actual.iter().zip(expected.iter()).enumerate() {
+        assert!(
+            (actual - expected).abs() <= tolerance,
+            "index={index}, actual={actual:?}, expected={expected:?}, tolerance={tolerance:?}"
+        );
+    }
 }
 
 #[derive(Deserialize)]

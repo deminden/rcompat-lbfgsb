@@ -42,10 +42,13 @@ jobs:
           cargo package --allow-dirty
 
   publish:
-    name: Publish crates.io
+    name: Deploy to crates.io
     needs: rust
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    concurrency:
+      group: crates-io-publish
+      cancel-in-progress: false
     permissions:
       contents: read
       deployments: write

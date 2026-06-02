@@ -16,8 +16,14 @@ quadratics, fixed coordinates in multi-dimensional supplied-gradient problems,
 active box constraints, all-unbounded supplied-gradient problems, mixed-bound
 and half/all-unbounded finite differences, scaled bounds, combined `fnscale`/`parscale`
 supplied-gradient and finite-difference scaling, positive finite-difference
-`pgtol` at both initial and post-step convergence, finite-difference `maxit`
-controls, `lmm` variants, and a Rosenbrock
+`pgtol` at both initial and post-step convergence, R's bound-distance-capped
+projected-gradient norm near finite bounds, finite-difference `maxit` controls,
+`lmm` variants, objective-only finite-box Rosenbrock, and a Rosenbrock
 evaluation trace prefix for active main-path backend parity work.
+The lower-bound finite-difference trace pins R's raw bounded-stencil call order:
+forward point first, then the clamped base point.
+The `line_search_refresh_sin_quad` fixture pins a nonconvex finite-box
+objective-only case where R refreshes L-BFGS memory during line search and still
+returns `factr` convergence.
 
 Real-data DESeq-derived fixture subsets live in `fixtures/deseq_real_subset/`.

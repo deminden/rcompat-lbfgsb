@@ -199,6 +199,57 @@ write_fixture(
   )
 )
 
+write_fixture(
+  "rosenbrock_finite_difference_box",
+  initial_par = c(-1.2, 1.0),
+  lower = c(-5.0, -5.0),
+  upper = c(5.0, 5.0),
+  control = list(ndeps = c(1e-4, 2e-4)),
+  fn = function(p) 100.0 * (p[[2]] - p[[1]] * p[[1]])^2 + (1.0 - p[[1]])^2
+)
+
+write_fixture(
+  "line_search_refresh_sin_quad",
+  initial_par = c(-0.60003378661349416, -1.04788708873093128),
+  lower = c(-5.0, -5.0),
+  upper = c(5.0, 5.0),
+  control = list(maxit = 80),
+  fn = function(p) sum(0.02 * p^2 + sin(15.0 * p) + 0.3 * cos(7.0 * sum(p)))
+)
+
+write_trace_fixture(
+  "rosenbrock_finite_difference_box_trace",
+  source_fixture = "rosenbrock_finite_difference_box",
+  initial_par = c(-1.2, 1.0),
+  lower = c(-5.0, -5.0),
+  upper = c(5.0, 5.0),
+  control = list(ndeps = c(1e-4, 2e-4), factr = 1e7, pgtol = 0.0, lmm = 5, maxit = 100),
+  fn = function(p) 100.0 * (p[[2]] - p[[1]] * p[[1]])^2 + (1.0 - p[[1]])^2,
+  gr = NULL,
+  prefix_len = 24
+)
+
+write_fixture(
+  "lower_bound_finite_difference_trace_probe",
+  initial_par = c(0.0, 1.0),
+  lower = c(0.0, -1.0),
+  upper = c(2.0, 1.0),
+  control = list(ndeps = c(0.1, 0.1), maxit = 0),
+  fn = function(p) p[[1]] + 2.0 * p[[2]]
+)
+
+write_trace_fixture(
+  "lower_bound_finite_difference_trace",
+  source_fixture = "lower_bound_finite_difference_trace_probe",
+  initial_par = c(0.0, 1.0),
+  lower = c(0.0, -1.0),
+  upper = c(2.0, 1.0),
+  control = list(ndeps = c(0.1, 0.1), factr = 1e7, pgtol = 0.0, lmm = 5, maxit = 0),
+  fn = function(p) p[[1]] + 2.0 * p[[2]],
+  gr = NULL,
+  prefix_len = 5
+)
+
 write_trace_fixture(
   "rosenbrock_default_trace",
   source_fixture = "rosenbrock",
@@ -506,6 +557,16 @@ write_fixture(
   control = list(pgtol = 0.2),
   fn = function(p) (p[[1]] - 2.0)^2,
   gr = function(p) c(2.0 * (p[[1]] - 2.0))
+)
+
+write_fixture(
+  "pgtol_near_upper_uses_bound_distance",
+  initial_par = c(0.99),
+  lower = c(-10.0),
+  upper = c(1.0),
+  control = list(pgtol = 0.02),
+  fn = function(p) -10.0 * p[[1]],
+  gr = function(p) c(-10.0)
 )
 
 write_fixture(
