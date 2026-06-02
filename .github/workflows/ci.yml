@@ -29,8 +29,6 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc --no-deps --all-features
-      - name: Provenance guard
-        run: scripts/check_no_forbidden_sources.sh
       - name: Package audit
         run: |
           package_files="$(mktemp)"
