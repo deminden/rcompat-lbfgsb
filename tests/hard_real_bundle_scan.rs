@@ -87,6 +87,8 @@ fn hard_real_bundle_can_scan_ignored_reference_data() {
     let value_relative_tolerance = env_f64("LBFGSB_HARD_REAL_VALUE_REL_TOL").unwrap_or(1e-12);
     let strict = env::var_os("LBFGSB_HARD_REAL_STRICT").is_some();
     let verbose = env::var_os("LBFGSB_HARD_REAL_VERBOSE").is_some();
+    let only_contrast = env::var("LBFGSB_HARD_REAL_ONLY_CONTRAST").ok();
+    let only_gene = env::var("LBFGSB_HARD_REAL_ONLY_GENE").ok();
 
     let rows = read_hard_rows(&root.join("global_hardest_512.tsv"));
     let mut contrast_cache = HashMap::<String, ContrastData>::new();
@@ -97,6 +99,15 @@ fn hard_real_bundle_can_scan_ignored_reference_data() {
     let mut failures = Vec::new();
 
     for row in rows.iter().take(limit) {
+        if only_contrast
+            .as_deref()
+            .is_some_and(|expected| expected != row.contrast)
+            || only_gene
+                .as_deref()
+                .is_some_and(|expected| expected != row.gene)
+        {
+            continue;
+        }
         let contrast_data = contrast_cache
             .entry(row.contrast.clone())
             .or_insert_with(|| ContrastData::load(root, &row.contrast));
@@ -116,14 +127,14 @@ fn hard_real_bundle_can_scan_ignored_reference_data() {
         let dimension = coefficients.initial.len();
         let bounds = Bounds::new(vec![-30.0; dimension], vec![30.0; dimension]).unwrap();
         let control = OptimControl {
-            maxit: 100,
+            maxit: env_usize("LBFGSB_HARD_REAL_MAXIT").unwrap_or(100),
             fnscale: 1.0,
             parscale: vec![1.0; dimension],
-            ndeps: vec![1e-3; dimension],
-            factr: 1e7,
+            ndeps: vec![1e-3 * env_f64("LBFGSB_HARD_REAL_NDEPS_SCALE").unwrap_or(1.0); dimension],
+            factr: env_f64("LBFGSB_HARD_REAL_FACTR").unwrap_or(1e7),
             pgtol: 0.0,
-            lmm: 5,
-            trace: 0,
+            lmm: env_usize("LBFGSB_HARD_REAL_LMM").unwrap_or(5),
+            trace: env_usize("LBFGSB_HARD_REAL_BACKEND_TRACE").unwrap_or(0),
             report: 1,
         };
 
@@ -190,6 +201,15 @@ fn hard_real_bundle_can_scan_ignored_reference_data() {
         both_close += usize::from(row_par_close && row_value_close);
 
         if verbose || !(row_par_close && row_value_close) {
+            if verbose {
+                println!(
+                    "HARD_REAL_PAR\t{}\t{}\tactual={}\texpected={}",
+                    row.contrast,
+                    row.gene,
+                    format_vector(&result.par),
+                    format_vector(&coefficients.force_optim)
+                );
+            }
             println!(
                 "HARD_REAL_SCAN\t{}\t{}\trouted={}\tpar_close={}\tvalue_close={}\tpar_err={:.17e}\tvalue_err={:.17e}\tvalue_rel_err={:.17e}\tpg={:.17e}\ttarget_pg={:.17e}\tconv={}\tcounts={}/{}\tforce_iter={}",
                 row.contrast,
@@ -263,6 +283,14 @@ fn hard_real_bundle_can_scan_ignored_reference_data() {
     if strict {
         assert_eq!(both_close, total, "hard real parity scan failures");
     }
+}
+
+fn format_vector(values: &[f64]) -> String {
+    values
+        .iter()
+        .map(|value| format!("{value:.17e}"))
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 impl ContrastData {

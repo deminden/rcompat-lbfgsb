@@ -124,6 +124,7 @@ fn deseq_hard_real_fixture_is_consistent() {
 fn deseq_hard_real_objective_only_optim_cases_match_r() {
     let fixture = hard_fixture();
     let scan_only = std::env::var_os("DESEQ_HARD_PARITY_SCAN").is_some();
+    let scan_verbose = std::env::var_os("DESEQ_HARD_PARITY_SCAN_VERBOSE").is_some();
     let trace_contrast = std::env::var("DESEQ_HARD_TRACE_CONTRAST").ok();
     let trace_gene = std::env::var("DESEQ_HARD_TRACE_GENE").ok();
     let only_contrast = std::env::var("DESEQ_HARD_ONLY_CONTRAST").ok();
@@ -177,6 +178,15 @@ fn deseq_hard_real_objective_only_optim_cases_match_r() {
             summary.record(&scan);
 
             if scan_only {
+                if scan_verbose {
+                    println!(
+                        "DESEQ_HARD_PAR\t{}\t{}\tactual={}\texpected={}",
+                        contrast.contrast,
+                        case.gene,
+                        format_vector(&result.par),
+                        format_vector(&case.result.par)
+                    );
+                }
                 println!(
                     "DESEQ_HARD_SCAN\t{}\t{}\tpar_err={:.17e}\tvalue_err={:.17e}\tcount_delta={}\tactual_counts={}/{}\texpected_counts={}/{}\tmessage={:?}",
                     contrast.contrast,
@@ -228,6 +238,14 @@ fn hard_fixture() -> HardFixture {
         "../fixtures/deseq_hard_real_subset/optim_cases.json"
     ))
     .unwrap()
+}
+
+fn format_vector(values: &[f64]) -> String {
+    values
+        .iter()
+        .map(|value| format!("{value:.17e}"))
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 fn nb_nll_without_constants(
