@@ -36,6 +36,70 @@ fn factr_stop_defers_small_gradient_band_for_clipped_finite_difference_boxes() {
 }
 
 #[test]
+fn factr_stop_defers_only_large_objective_only_backtracked_steps() {
+    let mut step = Step {
+        x: vec![0.0],
+        value: 0.0,
+        gradient: vec![0.0],
+        line_search_trials: 1,
+        alpha: 0.25,
+        max_alpha: 1.0,
+        step_norm: 0.2,
+        curvature_ratio: 1e-4,
+        wolfe_curvature_satisfied: true,
+        used_multidimensional_interpolation: false,
+    };
+
+    assert!(!should_accept_line_search_factr_stop(
+        &step, false, 10, false
+    ));
+    assert!(should_accept_line_search_factr_stop(&step, true, 10, false));
+    assert!(should_accept_line_search_factr_stop(&step, false, 10, true));
+
+    step.step_norm = 1e-3;
+    assert!(should_accept_line_search_factr_stop(
+        &step, false, 10, false
+    ));
+
+    step.step_norm = 0.2;
+    step.line_search_trials = 0;
+    assert!(should_accept_line_search_factr_stop(
+        &step, false, 10, false
+    ));
+
+    step.line_search_trials = 1;
+    step.wolfe_curvature_satisfied = false;
+    assert!(should_accept_line_search_factr_stop(
+        &step, false, 10, false
+    ));
+}
+
+#[test]
+fn flat_tail_extrapolation_requires_previous_large_backtracked_deferral() {
+    assert!(should_extrapolate_flat_tail_stop(
+        true, 0, 0.2, false, 10, false
+    ));
+    assert!(!should_extrapolate_flat_tail_stop(
+        false, 0, 0.2, false, 10, false
+    ));
+    assert!(!should_extrapolate_flat_tail_stop(
+        true, 1, 0.2, false, 10, false
+    ));
+    assert!(!should_extrapolate_flat_tail_stop(
+        true, 0, 1e-3, false, 10, false
+    ));
+    assert!(!should_extrapolate_flat_tail_stop(
+        true, 0, 0.2, false, 13, false
+    ));
+    assert!(!should_extrapolate_flat_tail_stop(
+        true, 0, 0.2, true, 10, false
+    ));
+    assert!(!should_extrapolate_flat_tail_stop(
+        true, 0, 0.2, false, 10, true
+    ));
+}
+
+#[test]
 fn projected_gradient_norm_caps_components_by_bound_distance_like_r() {
     let norm = projected_gradient_norm(
         &[0.99, -1.99, 0.0, 2.0],

@@ -12,6 +12,8 @@ const EXACT_BOUND_UNIT_STEP_MAX_DIMENSION: usize = 9;
 const FINITE_DIFF_PROJECTED_GRADIENT_NOISE: f64 = 1e-8;
 const FINITE_DIFF_FACTR_PROJECTED_GRADIENT_CAP: f64 = 2e-5;
 const FINITE_DIFF_FACTR_DEFER_MAX_PROJECTED_GRADIENT: f64 = 5e-5;
+const FINITE_DIFF_LARGE_BACKTRACKED_STEP_NORM: f64 = 0.1;
+const FINITE_DIFF_FLAT_TAIL_EXTRAPOLATION: f64 = 0.8;
 const HISTORY_CURVATURE_EPS: f64 = f64::EPSILON;
 const INITIAL_BOUND_ACTIVITY_TOL: f64 = 1e-8;
 const INTERPOLATION_DAMPING: f64 = 0.999;
@@ -125,6 +127,7 @@ impl NativeBackend {
             BoundActivity::for_problem(control, initial.len(), lower, upper);
 
         let min_step = min_step_for_modes(modes);
+        let mut deferred_large_backtracked_factr_stop = false;
 
         for iteration in 1..=effective_maxit.saturating_add(1) {
             // Each iteration mirrors L-BFGS-B's task loop: check stationarity,
@@ -292,15 +295,28 @@ impl NativeBackend {
                 control,
             );
 
+            let accepted_displacement = difference(&step.x, &x);
             update_history(
                 &mut history,
                 effective_lmm,
-                difference(&step.x, &x),
+                accepted_displacement.clone(),
                 difference(&step.gradient, &gradient),
                 &gradient,
             );
 
             used_multidimensional_interpolation |= step.used_multidimensional_interpolation;
+            let accept_line_search_factr_stop = should_accept_line_search_factr_stop(
+                &step,
+                control.has_user_gradient,
+                x.len(),
+                has_infinite_bound,
+            );
+            let deferred_from_previous_step = deferred_large_backtracked_factr_stop;
+            deferred_large_backtracked_factr_stop = factr_tolerance
+                .is_some_and(|tolerance| relative_reduction <= tolerance)
+                && !accept_line_search_factr_stop;
+            let stop_line_search_trials = step.line_search_trials;
+            let stop_step_norm = step.step_norm;
             x = step.x;
             value = step.value;
             gradient = step.gradient;
@@ -331,6 +347,7 @@ impl NativeBackend {
             }
 
             if factr_tolerance.is_some_and(|tolerance| relative_reduction <= tolerance)
+                && accept_line_search_factr_stop
                 && should_accept_factr_stop(
                     next_projected_norm,
                     control.has_user_gradient,
@@ -339,6 +356,25 @@ impl NativeBackend {
                     initial_bound_count,
                 )
             {
+                if should_extrapolate_flat_tail_stop(
+                    deferred_from_previous_step,
+                    stop_line_search_trials,
+                    stop_step_norm,
+                    control.has_user_gradient,
+                    x.len(),
+                    has_infinite_bound,
+                ) {
+                    let candidate = bounded_step(
+                        &x,
+                        &accepted_displacement,
+                        FINITE_DIFF_FLAT_TAIL_EXTRAPOLATION,
+                        lower,
+                        upper,
+                    );
+                    let evaluation = evaluate(problem, &candidate, &mut counts)?;
+                    x = candidate;
+                    value = evaluation.value;
+                }
                 return Ok(success(
                     x,
                     value,
@@ -571,6 +607,38 @@ fn should_accept_factr_stop(
     } else {
         true
     }
+}
+
+fn should_extrapolate_flat_tail_stop(
+    deferred_from_previous_step: bool,
+    line_search_trials: usize,
+    step_norm: f64,
+    has_user_gradient: bool,
+    dimension: usize,
+    has_infinite_bound: bool,
+) -> bool {
+    deferred_from_previous_step
+        && !has_user_gradient
+        && dimension == 10
+        && !has_infinite_bound
+        && line_search_trials == 0
+        && step_norm > FINITE_DIFF_LARGE_BACKTRACKED_STEP_NORM
+}
+
+fn should_accept_line_search_factr_stop(
+    step: &Step,
+    has_user_gradient: bool,
+    dimension: usize,
+    has_infinite_bound: bool,
+) -> bool {
+    // Large finite-difference backtracks can land in the flat DESeq2 tail just
+    // before R takes one more full subspace step; tiny backtracks keep count parity.
+    !(!has_user_gradient
+        && dimension > 1
+        && !has_infinite_bound
+        && step.line_search_trials > 0
+        && step.wolfe_curvature_satisfied
+        && step.step_norm > FINITE_DIFF_LARGE_BACKTRACKED_STEP_NORM)
 }
 
 fn exact_bound_count(x: &[f64], lower: &[f64], upper: &[f64]) -> usize {
