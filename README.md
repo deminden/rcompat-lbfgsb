@@ -36,7 +36,8 @@ the relevant bound. A compact synthetic fixture guards R's line-search
 memory-refresh behavior in a finite-box objective-only nonconvex case. The
 committed hard-real DESeq2 guard covers 48 direct R objective-only optimizer
 replays and currently has exact optimizer-count parity for 36 of them, with
-worst optimizer-count drift bounded at 10.
+worst parameter drift at `0.0034756018` and worst optimizer-count drift bounded
+at 8.
 
 Known early limitations:
 

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Updated release-facing parity notes after the `0.1.5` hard-case improvement:
+  the committed hard-real DESeq2 guard still covers 48 direct R objective-only
+  optimizer replays with 36 exact optimizer-count matches, while the worst
+  parameter drift is now `0.0034756018` and worst optimizer-count drift is
+  bounded at 8.
+
 - Initialized the clean-room crate scaffold.
 - Added provenance, architecture, validation, scaling, finite-difference, and
   bounded backend foundations.
