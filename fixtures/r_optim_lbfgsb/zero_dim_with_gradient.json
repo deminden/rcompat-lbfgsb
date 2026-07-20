@@ -23,6 +23,6 @@
     "convergence": 0,
     "message": "NOTHING TO DO"
   },
-  "r_version": "R version 4.3.3 (2024-02-29)",
-  "platform": "x86_64-pc-linux-gnu"
+  "r_version": "R version 4.6.0 (2026-04-24)",
+  "platform": "x86_64-conda-linux-gnu"
 }

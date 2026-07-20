@@ -138,6 +138,7 @@ fn deseq_real_gradient_optim_cases_match_r() {
         let counts = counts_for_gene(&tables.counts, &case.gene);
         let should_trace = trace_gene.as_deref() == Some(case.gene.as_str());
         let mut trace_call = 0_usize;
+        let mut trace_gradient_call = 0_usize;
         let result = optim_lbfgsb_with_gradient(
             case.initial_par.clone(),
             Bounds::new(case.lower.clone(), case.upper.clone()).unwrap(),
@@ -154,9 +155,41 @@ fn deseq_real_gradient_optim_cases_match_r() {
                             .join("\t")
                     );
                 }
-                nb_nll_without_constants(beta, &counts, &design, &size_factors, case.dispersion)
+                let value = nb_nll_without_constants(
+                    beta,
+                    &counts,
+                    &design,
+                    &size_factors,
+                    case.dispersion,
+                );
+                if should_trace {
+                    println!(
+                        "DESEQ_TRACE_FN\t{}\t{}\t{value:.17e}\t{:016x}",
+                        case.gene,
+                        trace_call,
+                        value.to_bits()
+                    );
+                }
+                value
             },
-            |beta| nb_nll_gradient(beta, &counts, &design, &size_factors, case.dispersion),
+            |beta| {
+                let gradient =
+                    nb_nll_gradient(beta, &counts, &design, &size_factors, case.dispersion);
+                if should_trace {
+                    trace_gradient_call += 1;
+                    println!(
+                        "DESEQ_TRACE_GR\t{}\t{}\t{}",
+                        case.gene,
+                        trace_gradient_call,
+                        gradient
+                            .iter()
+                            .map(|value| format!("{value:.17e}/{:016x}", value.to_bits()))
+                            .collect::<Vec<_>>()
+                            .join("\t")
+                    );
+                }
+                gradient
+            },
             control_from_case(&case.control),
         )
         .unwrap();
@@ -284,16 +317,189 @@ fn nb_nll_without_constants(
     dispersion: f64,
 ) -> f64 {
     let size = 1.0 / dispersion;
-    counts
-        .iter()
-        .zip(design.iter())
-        .zip(size_factors.iter())
-        .map(|((&count, row), &size_factor)| {
-            let eta = row_dot(row, beta) + size_factor.ln();
-            let mu = eta.exp();
-            (count + size) * (size + mu).ln() - size * size.ln() - count * mu.ln()
-        })
-        .sum()
+    r_style_sum(
+        counts
+            .iter()
+            .zip(design.iter())
+            .zip(size_factors.iter())
+            .map(|((&count, row), &size_factor)| {
+                let eta = row_dot(row, beta) + size_factor.ln();
+                let mu = eta.exp();
+                (count + size) * (size + mu).ln() - size * size.ln() - count * mu.ln()
+            }),
+    )
+}
+
+fn r_style_sum(values: impl IntoIterator<Item = f64>) -> f64 {
+    let values = values.into_iter().collect::<Vec<_>>();
+    if values.iter().any(|value| !value.is_finite()) {
+        return values.iter().copied().sum();
+    }
+    values
+        .into_iter()
+        .fold(ExtendedAccumulator::ZERO, ExtendedAccumulator::add_f64)
+        .to_f64()
+}
+
+/// Safe software model of the 64-bit-significand accumulator used by R's
+/// platform `long double`. Inputs are binary64 and every addition rounds to
+/// the x87 extended precision before the final binary64 conversion.
+#[derive(Debug, Clone, Copy)]
+struct ExtendedAccumulator {
+    negative: bool,
+    exponent: i32,
+    significand: u64,
+}
+
+impl ExtendedAccumulator {
+    const ZERO: Self = Self {
+        negative: false,
+        exponent: 0,
+        significand: 0,
+    };
+
+    fn from_f64(value: f64) -> Self {
+        debug_assert!(value.is_finite());
+        let bits = value.to_bits();
+        let negative = bits >> 63 != 0;
+        let exponent_field = ((bits >> 52) & 0x7ff) as i32;
+        let fraction = bits & ((1_u64 << 52) - 1);
+        if exponent_field == 0 {
+            if fraction == 0 {
+                return Self::ZERO;
+            }
+            let shift = fraction.leading_zeros();
+            return Self {
+                negative,
+                exponent: -1011 - shift as i32,
+                significand: fraction << shift,
+            };
+        }
+        Self {
+            negative,
+            exponent: exponent_field - 1023,
+            significand: ((1_u64 << 52) | fraction) << 11,
+        }
+    }
+
+    fn add_f64(self, value: f64) -> Self {
+        self.add(Self::from_f64(value))
+    }
+
+    fn add(self, other: Self) -> Self {
+        if self.significand == 0 {
+            return other;
+        }
+        if other.significand == 0 {
+            return self;
+        }
+
+        let (larger, smaller) = if self.exponent > other.exponent
+            || (self.exponent == other.exponent && self.significand >= other.significand)
+        {
+            (self, other)
+        } else {
+            (other, self)
+        };
+        let exponent_delta = (larger.exponent - smaller.exponent) as u32;
+        let larger_extended = (larger.significand as u128) << 3;
+        let smaller_extended = shift_right_jam((smaller.significand as u128) << 3, exponent_delta);
+        let mut exponent = larger.exponent;
+
+        let extended = if larger.negative == smaller.negative {
+            let mut sum = larger_extended + smaller_extended;
+            if sum >= 1_u128 << 67 {
+                sum = shift_right_jam(sum, 1);
+                exponent += 1;
+            }
+            sum
+        } else {
+            let mut difference = larger_extended - smaller_extended;
+            if difference == 0 {
+                return Self::ZERO;
+            }
+            while difference < 1_u128 << 66 {
+                difference <<= 1;
+                exponent -= 1;
+            }
+            difference
+        };
+
+        Self::round_extended(larger.negative, exponent, extended)
+    }
+
+    fn round_extended(negative: bool, mut exponent: i32, extended: u128) -> Self {
+        let mut significand = extended >> 3;
+        let round_bits = extended & 0b111;
+        if round_bits > 0b100 || (round_bits == 0b100 && significand & 1 != 0) {
+            significand += 1;
+        }
+        if significand >= 1_u128 << 64 {
+            significand >>= 1;
+            exponent += 1;
+        }
+        Self {
+            negative,
+            exponent,
+            significand: significand as u64,
+        }
+    }
+
+    fn to_f64(self) -> f64 {
+        if self.significand == 0 {
+            return 0.0;
+        }
+        let sign = (self.negative as u64) << 63;
+        if self.exponent > 1023 {
+            return f64::from_bits(sign | (0x7ff_u64 << 52));
+        }
+
+        if self.exponent >= -1022 {
+            let mut exponent = self.exponent;
+            let mut rounded = round_shift_nearest_even(self.significand as u128, 11);
+            if rounded >= 1_u128 << 53 {
+                rounded >>= 1;
+                exponent += 1;
+                if exponent > 1023 {
+                    return f64::from_bits(sign | (0x7ff_u64 << 52));
+                }
+            }
+            let exponent_bits = ((exponent + 1023) as u64) << 52;
+            let fraction = rounded as u64 & ((1_u64 << 52) - 1);
+            return f64::from_bits(sign | exponent_bits | fraction);
+        }
+
+        let shift = (-self.exponent - 1011) as u32;
+        let rounded = round_shift_nearest_even(self.significand as u128, shift);
+        if rounded >= 1_u128 << 52 {
+            return f64::from_bits(sign | (1_u64 << 52));
+        }
+        f64::from_bits(sign | rounded as u64)
+    }
+}
+
+fn shift_right_jam(value: u128, shift: u32) -> u128 {
+    if shift == 0 {
+        return value;
+    }
+    if shift >= 128 {
+        return u128::from(value != 0);
+    }
+    let discarded = value & ((1_u128 << shift) - 1);
+    (value >> shift) | u128::from(discarded != 0)
+}
+
+fn round_shift_nearest_even(value: u128, shift: u32) -> u128 {
+    if shift == 0 {
+        return value;
+    }
+    if shift >= 128 {
+        return 0;
+    }
+    let truncated = value >> shift;
+    let remainder = value & ((1_u128 << shift) - 1);
+    let halfway = 1_u128 << (shift - 1);
+    truncated + u128::from(remainder > halfway || (remainder == halfway && truncated & 1 != 0))
 }
 
 fn nb_nll_gradient(
@@ -304,23 +510,72 @@ fn nb_nll_gradient(
     dispersion: f64,
 ) -> Vec<f64> {
     let size = 1.0 / dispersion;
-    let mut gradient = vec![0.0; beta.len()];
-    for ((&count, row), &size_factor) in counts.iter().zip(design.iter()).zip(size_factors.iter()) {
-        let eta = row_dot(row, beta) + size_factor.ln();
-        let mu = eta.exp();
-        let residual = (count + size) * mu / (size + mu) - count;
-        for (target, &x) in gradient.iter_mut().zip(row.iter()) {
-            *target += x * residual;
-        }
+    let residuals = counts
+        .iter()
+        .zip(design.iter())
+        .zip(size_factors.iter())
+        .map(|((&count, row), &size_factor)| {
+            let eta = row_dot(row, beta) + size_factor.ln();
+            let mu = eta.exp();
+            (count + size) * mu / (size + mu) - count
+        })
+        .collect::<Vec<_>>();
+
+    (0..beta.len())
+        .map(|column| openblas_cooperlake_crossprod_column(design, column, &residuals))
+        .collect()
+}
+
+fn openblas_cooperlake_crossprod_column(
+    design: &[Vec<f64>],
+    column: usize,
+    residuals: &[f64],
+) -> f64 {
+    assert_eq!(design.len(), residuals.len());
+
+    // R's `crossprod(x, residual)` reaches the four-lane Cooperlake/Haswell
+    // OpenBLAS DGEMV-T microkernel for this contiguous 78-row matrix. Each
+    // lane is accumulated with FMA, then the four lanes are reduced in this
+    // order; the final one-to-three rows are added by the scalar tail.
+    let bulk_len = residuals.len() & !3;
+    let mut lanes = [0.0_f64; 4];
+    for index in 0..bulk_len {
+        let lane = index & 3;
+        lanes[lane] = design[index][column].mul_add(residuals[index], lanes[lane]);
     }
-    gradient
+    let mut result = (lanes[2] + lanes[0]) + (lanes[3] + lanes[1]);
+    if bulk_len < residuals.len() {
+        let tail = (bulk_len..residuals.len())
+            .map(|index| design[index][column] * residuals[index])
+            .sum::<f64>();
+        result += tail;
+    }
+    result
 }
 
 fn row_dot(row: &[f64], beta: &[f64]) -> f64 {
-    row.iter()
-        .zip(beta.iter())
-        .map(|(&x, &parameter)| x * parameter)
-        .sum()
+    // The R 4.6.0 generator evaluates `x %*% beta` through the configured
+    // short-column OpenBLAS DGEMV. Reproduce its four-column accumulation so
+    // this test isolates optimizer behavior from callback arithmetic.
+    let mut sum = 0.0;
+    let mut index = 0;
+    while index + 4 <= row.len() {
+        let mut group = row[index] * beta[index];
+        group = row[index + 1].mul_add(beta[index + 1], group);
+        group = row[index + 2].mul_add(beta[index + 2], group);
+        group = row[index + 3].mul_add(beta[index + 3], group);
+        sum += group;
+        index += 4;
+    }
+    if index + 2 <= row.len() {
+        let group = row[index + 1].mul_add(beta[index + 1], row[index] * beta[index]);
+        sum += group;
+        index += 2;
+    }
+    if index < row.len() {
+        sum += row[index] * beta[index];
+    }
+    sum
 }
 
 fn control_from_case(control: &DeseqControl) -> OptimControl {

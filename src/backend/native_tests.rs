@@ -213,6 +213,31 @@ fn exact_bound_activity_is_limited_to_objective_only_finite_boxes() {
 }
 
 #[test]
+fn exact_compact_path_uses_raw_factr_lmm_and_maxit_controls() {
+    let control = BackendControl {
+        has_user_gradient: false,
+        maxit: 100,
+        factr: 1e7,
+        pgtol: 0.0,
+        lmm: 5,
+        trace: 0,
+        report: 10,
+    };
+
+    let exact = effective_run_controls(control, true, 13, false, 0, 0, 50.0, 30.0);
+    assert_eq!(exact.factr_tolerance, Some(1e7 * f64::EPSILON));
+    assert_eq!(exact.lmm, 5);
+    assert_eq!(exact.maxit, 100);
+
+    let adjusted_lmm = effective_run_controls(control, false, 13, false, 0, 0, 50.0, 30.0);
+    assert_eq!(adjusted_lmm.lmm, 4);
+    let adjusted_maxit = effective_run_controls(control, false, 13, false, 0, 0, 50.0, 5.0);
+    assert_eq!(adjusted_maxit.maxit, 106);
+    let adjusted_factr = effective_run_controls(control, false, 11, false, 1, 1, 1000.0, 30.0);
+    assert_eq!(adjusted_factr.factr_tolerance, Some(1e8 * f64::EPSILON));
+}
+
+#[test]
 fn history_update_accepts_machine_epsilon_scale_positive_curvature() {
     let mut history = Vec::new();
 
@@ -255,6 +280,72 @@ fn more_thuente_retry_warning_requires_narrow_bracket() {
     assert!(!more_thuente_retry_warning(10.0, 21.0, true));
     assert!(!more_thuente_retry_warning(10.0, 14.9, false));
     assert!(!more_thuente_retry_warning(0.0, 0.0, true));
+}
+
+#[test]
+fn more_thuente_retry_restore_requires_the_task_warning_width() {
+    assert!(more_thuente_retry_restore(10.0, 11.0, true));
+    assert!(!more_thuente_retry_restore(10.0, 11.2, true));
+    assert!(!more_thuente_retry_restore(10.0, 11.0, false));
+    assert!(!more_thuente_retry_restore(0.0, 0.0, true));
+}
+
+#[test]
+fn exact_more_thuente_warning_restores_and_accepts_only_at_task_width() {
+    let best = f64::from_bits(0x4066_9849_a456_50ea);
+    let narrow_other = f64::from_bits(0x4064_989a_67d2_0d2b);
+    let wider_other = f64::from_bits(0x4063_5766_db0c_a2ee);
+
+    assert!(more_thuente_restores_best(
+        true,
+        false,
+        best,
+        narrow_other,
+        true
+    ));
+    assert!(more_thuente_accepts_warning(
+        true,
+        false,
+        best,
+        narrow_other,
+        true
+    ));
+    assert!(!more_thuente_restores_best(
+        true,
+        false,
+        best,
+        wider_other,
+        true
+    ));
+    assert!(!more_thuente_accepts_warning(
+        true,
+        false,
+        best,
+        wider_other,
+        true
+    ));
+
+    assert!(more_thuente_accepts_warning(
+        false,
+        true,
+        best,
+        wider_other,
+        true
+    ));
+    assert!(!more_thuente_accepts_warning(
+        false,
+        false,
+        best,
+        narrow_other,
+        true
+    ));
+    assert!(!more_thuente_restores_best(
+        true,
+        false,
+        best,
+        narrow_other,
+        false
+    ));
 }
 
 #[test]
@@ -603,6 +694,7 @@ fn line_search_reports_zero_trials_for_accepted_full_step() {
             allow_quadratic_interpolation: false,
             allow_retry_warning_accept: false,
             min_step: MIN_STEP,
+            exact_operations: false,
             quadratic_interpolation_damping: INTERPOLATION_DAMPING,
         },
         &mut counts,
@@ -644,12 +736,124 @@ fn line_search_candidate_copies_exact_unit_step_target() {
             allow_quadratic_interpolation: false,
             allow_retry_warning_accept: false,
             min_step: MAIN_PATH_MIN_STEP,
+            exact_operations: false,
             quadratic_interpolation_damping: INTERPOLATION_DAMPING,
         },
         1.0,
     );
 
     assert_eq!(candidate[0].to_bits(), target[0].to_bits());
+}
+
+#[test]
+fn exact_line_search_candidate_keeps_feasible_bound_roundoff() {
+    fn replay(x_value: u64, direction_value: u64, alpha: u64) -> (u64, u64) {
+        let x = [f64::from_bits(x_value)];
+        let direction = [f64::from_bits(direction_value)];
+        let lower = [-30.0];
+        let upper = [30.0];
+        let candidate = |exact_operations| {
+            line_search_candidate(
+                &LineSearchRequest {
+                    x: &x,
+                    value: 0.0,
+                    gradient: &[-1.0],
+                    direction: &direction,
+                    unit_step_target: None,
+                    lower: &lower,
+                    upper: &upper,
+                    max_step_cap: None,
+                    cap_initial_unbounded_step: false,
+                    initial_step_cap: None,
+                    allow_quadratic_interpolation: false,
+                    allow_retry_warning_accept: false,
+                    min_step: MAIN_PATH_MIN_STEP,
+                    exact_operations,
+                    quadratic_interpolation_damping: INTERPOLATION_DAMPING,
+                },
+                f64::from_bits(alpha),
+            )[0]
+            .to_bits()
+        };
+        (candidate(true), candidate(false))
+    }
+
+    // R 4.6.0 black-box traces: synthetic cases 0135/call 93 and 0370/call
+    // 109. The safeguarded scalar is already exact; the affine update retains
+    // the one- or two-ULP bound overshoot, while the tolerant path clamps it.
+    let (case_0135_exact, case_0135_clamped) = replay(
+        0x403e_0000_0000_0000,
+        0xc018_8f82_b6b9_8f84,
+        0x4023_8b23_327e_4338,
+    );
+    assert_eq!(case_0135_exact, 0xc03e_0000_0000_0002);
+    assert_eq!(case_0135_clamped, (-30.0_f64).to_bits());
+
+    let (case_0370_exact, case_0370_clamped) = replay(
+        0x4032_2977_b96a_9ed3,
+        0xc006_4fa0_78dd_4b90,
+        0x4031_44f0_338c_48bb,
+    );
+    assert_eq!(case_0370_exact, 0xc03e_0000_0000_0001);
+    assert_eq!(case_0370_clamped, (-30.0_f64).to_bits());
+}
+
+#[test]
+fn more_thuente_case_three_respects_exact_feasible_step_cap() {
+    fn replay(
+        x_value: u64,
+        direction_value: u64,
+        best: MoreThuentePoint,
+        trial: MoreThuentePoint,
+        expected: u64,
+    ) {
+        let x = [f64::from_bits(x_value)];
+        let direction = [f64::from_bits(direction_value)];
+        let step_cap = max_feasible_step(&x, &direction, &[-30.0], &[30.0]);
+        assert_eq!(step_cap.to_bits(), expected);
+
+        let cubic = more_thuente_cubic_case_three(best, trial).expect("case-three cubic step");
+        assert!(cubic > step_cap);
+        let mut state = MoreThuenteStepState {
+            best,
+            other: best,
+            bracketed: false,
+        };
+        let next = more_thuente_step(&mut state, trial, 0.0, step_cap);
+        assert_eq!(next.to_bits(), expected);
+    }
+
+    replay(
+        0x403e_0000_0000_0000,
+        0xc018_8f82_b6b9_8f84,
+        MoreThuentePoint {
+            alpha: f64::from_bits(0x3ff0_0000_0000_0000),
+            value: f64::from_bits(0x4093_7fd6_92a2_9b17),
+            derivative: f64::from_bits(0xc06a_9aea_9c7c_d910),
+        },
+        MoreThuentePoint {
+            alpha: f64::from_bits(0x4014_0000_0000_0000),
+            value: f64::from_bits(0x4079_0b70_fbbe_3573),
+            derivative: f64::from_bits(0xc068_88b4_4079_5f3f),
+        },
+        0x4023_8b23_327e_4338,
+    );
+
+    replay(
+        0x4032_2977_b96a_9ed3,
+        0xc006_4fa0_78dd_4b90,
+        MoreThuentePoint {
+            alpha: f64::from_bits(0x3ff0_0000_0000_0000),
+            value: f64::from_bits(0x4060_74e7_ac0b_b1fb),
+            derivative: f64::from_bits(0xc026_eaa7_7487_2309),
+        },
+        MoreThuentePoint {
+            alpha: f64::from_bits(0x4014_0000_0000_0000),
+            value: f64::from_bits(0x4055_74f7_76e2_5e47),
+            derivative: f64::from_bits(0xc026_e2bd_8334_f324),
+        },
+        0x4031_44f0_338c_48bb,
+    );
 }
 
 #[test]
@@ -692,6 +896,7 @@ fn line_search_reports_interpolated_trial_after_rejected_full_step() {
             allow_quadratic_interpolation: true,
             allow_retry_warning_accept: false,
             min_step: MIN_STEP,
+            exact_operations: false,
             quadratic_interpolation_damping: INTERPOLATION_DAMPING,
         },
         &mut counts,
@@ -729,6 +934,7 @@ fn line_search_diagnoses_armijo_step_that_is_too_short_for_wolfe_curvature() {
             allow_quadratic_interpolation: false,
             allow_retry_warning_accept: false,
             min_step: MIN_STEP,
+            exact_operations: false,
             quadratic_interpolation_damping: INTERPOLATION_DAMPING,
         },
         &mut counts,
@@ -765,6 +971,7 @@ fn more_thuente_accepts_r_max_step_warning_case() {
             allow_quadratic_interpolation: false,
             allow_retry_warning_accept: false,
             min_step: MAIN_PATH_MIN_STEP,
+            exact_operations: false,
             quadratic_interpolation_damping: INTERPOLATION_DAMPING,
         },
         &mut counts,
@@ -800,6 +1007,7 @@ fn strong_wolfe_line_search_expands_beyond_unit_alpha_when_direction_is_short() 
             allow_quadratic_interpolation: false,
             allow_retry_warning_accept: false,
             min_step: MIN_STEP,
+            exact_operations: false,
             quadratic_interpolation_damping: INTERPOLATION_DAMPING,
         },
         &mut counts,
@@ -836,6 +1044,7 @@ fn strong_wolfe_line_search_zooms_after_overlarge_unit_step() {
             allow_quadratic_interpolation: false,
             allow_retry_warning_accept: false,
             min_step: MIN_STEP,
+            exact_operations: false,
             quadratic_interpolation_damping: INTERPOLATION_DAMPING,
         },
         &mut counts,
@@ -871,6 +1080,7 @@ fn strong_wolfe_line_search_accepts_armijo_step_at_feasible_cap() {
             allow_quadratic_interpolation: false,
             allow_retry_warning_accept: false,
             min_step: MIN_STEP,
+            exact_operations: false,
             quadratic_interpolation_damping: INTERPOLATION_DAMPING,
         },
         &mut counts,
@@ -908,6 +1118,7 @@ fn strong_wolfe_line_search_propagates_evaluation_errors() {
             allow_quadratic_interpolation: false,
             allow_retry_warning_accept: false,
             min_step: MIN_STEP,
+            exact_operations: false,
             quadratic_interpolation_damping: INTERPOLATION_DAMPING,
         },
         &mut counts,
@@ -1389,6 +1600,7 @@ fn fourth_iteration_more_thuente_extrapolates_to_r_trace_step() {
             allow_quadratic_interpolation: false,
             allow_retry_warning_accept: false,
             min_step: MAIN_PATH_MIN_STEP,
+            exact_operations: false,
             quadratic_interpolation_damping: INTERPOLATION_DAMPING,
         },
         &mut counts,
@@ -1455,6 +1667,7 @@ fn capped_cauchy_subspace_first_step_matches_r_trace_shape() {
             allow_quadratic_interpolation: true,
             allow_retry_warning_accept: false,
             min_step: MIN_STEP,
+            exact_operations: false,
             quadratic_interpolation_damping: INTERPOLATION_DAMPING,
         },
         &mut counts,
@@ -1521,6 +1734,7 @@ fn more_thuente_cauchy_first_step_matches_r_trace_prefix() {
             allow_quadratic_interpolation: false,
             allow_retry_warning_accept: false,
             min_step: MAIN_PATH_MIN_STEP,
+            exact_operations: false,
             quadratic_interpolation_damping: INTERPOLATION_DAMPING,
         },
         &mut counts,

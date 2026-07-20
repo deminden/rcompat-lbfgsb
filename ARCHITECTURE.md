@@ -56,13 +56,13 @@ minimizer, and More-Thuente-style line search with bracketed
 cubic/quadratic/secant step updates. That is the current main R-compatibility
 path, including DESeq2-style `[-30, 30]` coefficient boxes.
 
-For smaller objective-only finite-box problems, the subspace minimizer uses a
-clean-room compact-matrix solve shaped after the L-BFGS-B 2.3 algorithmic
-description used by R's bundled optimizer. The gate is intentionally limited to
-dimensions up to 10 because the current compact subspace solve reduces the
-hard-real worst optimizer-count drift from 18 to 10 there, while wider full
-designs still need the Cauchy workspace ported before the compact arithmetic is
-universally better.
+For every multidimensional fully finite box on the default Cauchy/subspace and
+More-Thuente path, the backend uses a coherent clean-room compact-matrix state
+shaped after the public L-BFGS-B algorithmic formulas. The same state and
+operation grouping apply to supplied-gradient and finite-difference problems;
+one-dimensional and mixed/infinite-bound finite-difference problems retain the
+older fallback path. Generated R 4.6.0 fixtures validate this routing across
+both callback forms and dimensions 4 through 13.
 
 The objective-only finite-box main path includes one early limited-memory
 refresh guard for the Cauchy/subspace model. R's bundled L-BFGS-B 2.3 can
@@ -83,13 +83,10 @@ More-Thuente trial is capped at `stp = 1`, matching the L-BFGS-B 2.3 code path
 bundled with R. When that capped trial satisfies sufficient decrease and keeps
 descending, the native backend accepts it as a successful R-style `STPMAX`
 warning case instead of forcing another extrapolation.
-For smaller objective-only finite-box Cauchy/subspace targets that land exactly
-on a finite bound, the main line search preserves R's full-step copy shape by
-reusing the precomputed target when `stp == 1` instead of recomputing `x + d`.
-The guard is kept narrow because supplied-gradient cases and larger weakly
-identified hard-real full-design cases still track R better when the clean-room
-dense subspace target is recomputed through the same arithmetic used for
-non-unit steps.
+For finite-box Cauchy/subspace targets that land exactly on a finite bound, the
+main line search preserves R's full-step copy shape by reusing the precomputed
+target when `stp == 1` instead of recomputing `x + d`. This is part of the
+coherent compact state for both supplied-gradient and finite-difference paths.
 
 The main path also has a narrow R-style line-search recovery for flat or
 nonconvex cases. If a line search exhausts its trial budget while correction
@@ -100,6 +97,12 @@ shaped step. The committed `line_search_refresh_sin_quad` fixture guards the
 public R behavior: a finite-box objective-only sinusoidal quadratic emits a
 line-search memory refresh in R and converges by `factr` rather than returning
 abnormal termination.
+
+An exact finite-box More-Thuente task also restores and re-evaluates its stored
+best point when the bracket width is at most one tenth of the current step cap.
+The narrower threshold is distinct from the one-half retry-warning threshold;
+raw R 4.6.0 call traces and a captured-bit scalar regression test guard the
+distinction.
 
 The More-Thuente main path uses a machine-epsilon-scale minimum step so
 finite-bound supplied-gradient problems can take R's final tiny cleanup step
@@ -192,24 +195,21 @@ noise.
 
 The DESeq-derived real-data subset is also an active production expectation for
 multi-dimensional supplied-gradient parity. Its compact 4-D negative-binomial
-GLM cases currently include seventeen actual optimizer-routed genes and fifty-one
-force-optimizer probes selected from a full ignored-data scan where 491 of 512
-DESeq rows matched the strict active contract. The committed cases match the
-generated R `optim` outputs on counts, convergence message, final value, and
-parameters within tight floating-point tolerances.
+GLM cases include seventeen actual optimizer-routed genes and fifty-one
+force-optimizer probes. The R 4.6.0 replay and Rust test reproduce all 68 saved
+parameters, values, optimizer counts, convergence codes, and messages
+bit-for-bit on the pinned callback arithmetic.
 
 The DESeq2 hard-real subset exercises objective-only finite-difference parity
-on 8 finite-box contrasts and 48 hard optimizer rows. The main path now matches
-optimizer-level counts exactly for 36 rows and keeps all committed cases within
-tight objective tolerance; weakly identified rows are guarded by objective
-equivalence rather than strict per-coefficient equality. The current worst
-optimizer-count drift in this subset is 10 evaluations.
+on 8 finite-box contrasts and 48 hard optimizer rows. The current main path
+reproduces every saved parameter, value, optimizer count, convergence code, and
+message bit-for-bit.
 
 Setting `DESEQ_PARITY_SCAN=1` keeps the same test running through every case and
 prints per-gene errors for ignored-data scans. `DESEQ_PARITY_SCAN_VERBOSE=1`
 adds actual and expected parameter vectors for failures, while
-`DESEQ_TRACE_GENE=<gene>` and `DESEQ_BACKEND_TRACE=<level>` expose paired R/Rust
-objective and backend traces for the remaining drift targets.
+`DESEQ_TRACE_GENE=<gene>` and `DESEQ_BACKEND_TRACE=<level>` expose callback and
+backend traces for future platform or fixture audits.
 
 These papers are algorithmic references, not source-code inputs.
 

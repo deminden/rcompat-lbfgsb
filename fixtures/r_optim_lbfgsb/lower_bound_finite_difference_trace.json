@@ -17,6 +17,6 @@
     "convergence": 1,
     "message": "NEW_X"
   },
-  "r_version": "R version 4.4.3 (2025-02-28)",
+  "r_version": "R version 4.6.0 (2026-04-24)",
   "platform": "x86_64-conda-linux-gnu"
 }

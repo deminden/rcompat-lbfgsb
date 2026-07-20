@@ -15,12 +15,12 @@ where
     for index in 0..x.len() {
         let h = ndeps[index];
         let forward_room = if upper[index].is_finite() {
-            (upper[index] - x[index]).max(0.0)
+            upper[index] - x[index]
         } else {
             h
         };
         let backward_room = if lower[index].is_finite() {
-            (x[index] - lower[index]).max(0.0)
+            x[index] - lower[index]
         } else {
             h
         };
@@ -119,5 +119,20 @@ mod tests {
                 vec![0.0, 0.9],
             ]
         );
+    }
+
+    #[test]
+    fn signed_bound_room_recovers_from_feasible_roundoff() {
+        let x = f64::from_bits(0xc03e_0000_0000_0002);
+        let mut calls = Vec::new();
+        let gradient = finite_difference_gradient(&[x], &[-30.0], &[30.0], &[1e-3], |point| {
+            calls.push(point[0]);
+            Ok(point[0])
+        })
+        .unwrap();
+
+        assert_eq!(calls[0].to_bits(), 0xc03d_ffbe_76c8_b43b);
+        assert_eq!(calls[1].to_bits(), (-30.0_f64).to_bits());
+        assert_eq!(gradient[0].to_bits(), 0x3ff0_0000_0000_1580);
     }
 }

@@ -2,11 +2,23 @@
 
 ## Unreleased
 
-- Updated release-facing parity notes after the `0.1.5` hard-case improvement:
-  the committed hard-real DESeq2 guard still covers 48 direct R objective-only
-  optimizer replays with 36 exact optimizer-count matches, while the worst
-  parameter drift is now `0.0034756018` and worst optimizer-count drift is
-  bounded at 8.
+## 0.2.0 - 2026-07-20
+
+### R 4.6.0 parity milestone
+
+- Regenerated all optimizer fixtures with pinned R 4.6.0 and reached bit-exact
+  endpoint, value, count, convergence, and message parity for all 68 committed
+  DESeq supplied-gradient cases, all 48 committed hard-real objective-only
+  cases, and all 512 ignored synthetic stress cases.
+- Added a coherent clean-room compact Cauchy/subspace state, exact finite-box
+  operation grouping, and R-shaped More-Thuente task-warning restoration. The
+  immutable worst-100 stress gate now clears its requested 10x precision gain
+  on 100/100 cases with zero endpoint error and no regressions.
+- Reworked the public documentation around the pinned R/OpenBLAS target stack,
+  the evidence-bounded meaning of bit-exact parity, reproducible validation,
+  and current limitations.
+
+### Earlier development history
 
 - Initialized the clean-room crate scaffold.
 - Added provenance, architecture, validation, scaling, finite-difference, and

@@ -256,16 +256,15 @@ fn nb_nll_without_constants(
     dispersion: f64,
 ) -> f64 {
     let size = 1.0 / dispersion;
-    counts
-        .iter()
-        .zip(design.iter())
-        .zip(size_factors.iter())
-        .map(|((&count, row), &size_factor)| {
-            let eta = DESEQ2_BETA_SCALE * row_dot(row, beta) + size_factor.ln();
-            let mu = eta.exp();
-            (count + size) * (size + mu).ln() - size * size.ln() - count * mu.ln()
-        })
-        .sum()
+    let mut total = 0.0;
+    for ((&count, row), &size_factor) in counts.iter().zip(design.iter()).zip(size_factors.iter()) {
+        let eta = DESEQ2_BETA_SCALE * row_dot(row, beta) + size_factor.ln();
+        let mu = eta.exp();
+        total += (count + size) * (size + mu).ln();
+        total -= size * size.ln();
+        total -= count * mu.ln();
+    }
+    total
 }
 
 fn row_dot(row: &[f64], beta: &[f64]) -> f64 {

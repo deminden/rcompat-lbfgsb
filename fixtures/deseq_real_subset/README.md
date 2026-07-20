@@ -16,7 +16,10 @@ R or DESeq runtime.
 
 The Rust test suite treats these sixty-eight cases as active parity checks for
 the multi-dimensional supplied-gradient path, covering seventeen actual
-optimizer-routed genes and fifty-one force-optimizer probes.
+optimizer-routed genes and fifty-one force-optimizer probes. The optimizer
+outputs were regenerated with R 4.6.0 on 2026-07-20; all 68 cases currently
+reproduce the saved parameters, values, counts, convergence codes, and messages
+bit-for-bit on the pinned callback arithmetic.
 
 For local ignored-data sweeps, regenerate with `DESEQ_FIXTURE_GENES=all` and run
 the DESeq test with `DESEQ_PARITY_SCAN=1`; normal test runs keep the strict

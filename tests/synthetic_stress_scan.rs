@@ -8,7 +8,7 @@ use std::process::Command;
 
 use rcompat_lbfgsb::{optim_lbfgsb, Bounds, OptimControl};
 
-const DATA_ROOT: &str = "data/lbfgsb_synthetic_stress_2026-06-06";
+const DATA_ROOT: &str = "data/lbfgsb_synthetic_stress_2026-07-20";
 const DESEQ2_BETA_SCALE: f64 = std::f64::consts::LN_2;
 
 #[derive(Debug)]
@@ -71,7 +71,9 @@ fn synthetic_stress_can_scan_ignored_reference_data() {
         return;
     }
 
-    let root = Path::new(DATA_ROOT);
+    let data_root =
+        env::var("LBFGSB_SYNTHETIC_STRESS_DATA_ROOT").unwrap_or_else(|_| DATA_ROOT.to_owned());
+    let root = Path::new(&data_root);
     assert!(
         root.exists(),
         "set LBFGSB_SYNTHETIC_STRESS_SCAN only when {DATA_ROOT} is available"
@@ -83,7 +85,11 @@ fn synthetic_stress_can_scan_ignored_reference_data() {
     let value_relative_tolerance = env_f64("LBFGSB_SYNTHETIC_STRESS_VALUE_REL_TOL").unwrap_or(1e-8);
     let strict = env::var_os("LBFGSB_SYNTHETIC_STRESS_STRICT").is_some();
     let verbose = env::var_os("LBFGSB_SYNTHETIC_STRESS_VERBOSE").is_some();
+    let raw_trace = env::var_os("LBFGSB_SYNTHETIC_STRESS_RAW_TRACE").is_some();
     let only_case = env::var("LBFGSB_SYNTHETIC_STRESS_ONLY_CASE").ok();
+    let selected_cases = env::var("LBFGSB_SYNTHETIC_STRESS_CASES")
+        .ok()
+        .map(|value| value.split(',').map(str::to_owned).collect::<Vec<_>>());
 
     let cases = read_cases(&root.join("cases.tsv"));
     let coefficients = read_coefficients(&root.join("coefficients.tsv"));
@@ -103,21 +109,39 @@ fn synthetic_stress_can_scan_ignored_reference_data() {
         {
             continue;
         }
+        if selected_cases
+            .as_ref()
+            .is_some_and(|selected| !selected.contains(&case.case_id))
+        {
+            continue;
+        }
         let problem = SyntheticProblem::from_parts(case, &coefficients, &samples);
         let dimension = problem.initial.len();
         let ndeps_scale = env_f64("LBFGSB_SYNTHETIC_STRESS_NDEPS_SCALE").unwrap_or(1.0);
+        let mut raw_call = 0_usize;
         let result = optim_lbfgsb(
             problem.initial.clone(),
             Bounds::new(problem.lower.clone(), problem.upper.clone()).unwrap(),
             |beta| {
-                nb_nll_without_constants(
+                let value = nb_nll_without_constants(
                     beta,
                     &problem.counts,
                     &problem.design,
                     &problem.size_factors,
                     problem.dispersion,
                     &problem.ridge,
-                )
+                );
+                raw_call += 1;
+                if raw_trace {
+                    println!(
+                        "SYNTHETIC_STRESS_RAW\t{}\tcall={}\tvalue={:.17e}\tpar={}",
+                        problem.case.case_id,
+                        raw_call,
+                        value,
+                        format_vector(beta)
+                    );
+                }
+                value
             },
             OptimControl {
                 maxit: env_usize("LBFGSB_SYNTHETIC_STRESS_MAXIT").unwrap_or(100),
@@ -245,6 +269,47 @@ fn synthetic_stress_can_scan_ignored_reference_data() {
     if strict {
         assert_eq!(both_close, total, "synthetic stress parity scan failures");
     }
+}
+
+#[test]
+fn synthetic_stress_can_replay_saved_r460_objectives_exactly() {
+    if env::var_os("LBFGSB_SYNTHETIC_STRESS_OBJECTIVE_REPLAY").is_none() {
+        return;
+    }
+
+    let root = Path::new(DATA_ROOT);
+    assert!(
+        root.exists(),
+        "set the replay flag only when {DATA_ROOT} is available"
+    );
+    let limit = env_usize("LBFGSB_SYNTHETIC_STRESS_LIMIT").unwrap_or(512);
+    let cases = read_cases(&root.join("cases.tsv"));
+    let coefficients = read_coefficients(&root.join("coefficients.tsv"));
+    let samples = read_samples(&root.join("samples.tsv.gz"));
+    let mut exact = 0_usize;
+
+    for case in cases.into_iter().take(limit) {
+        let problem = SyntheticProblem::from_parts(case, &coefficients, &samples);
+        let actual = nb_nll_without_constants(
+            &problem.optim_par,
+            &problem.counts,
+            &problem.design,
+            &problem.size_factors,
+            problem.dispersion,
+            &problem.ridge,
+        );
+        if actual.to_bits() == problem.case.optim_value.to_bits() {
+            exact += 1;
+        } else {
+            println!(
+                "SYNTHETIC_STRESS_OBJECTIVE_MISMATCH\t{}\tactual={actual:.17e}\texpected={:.17e}",
+                problem.case.case_id, problem.case.optim_value
+            );
+        }
+    }
+
+    println!("SYNTHETIC_STRESS_OBJECTIVE_SUMMARY\ttotal={limit}\texact={exact}");
+    assert_eq!(exact, limit);
 }
 
 impl SyntheticProblem {
@@ -446,22 +511,206 @@ fn nb_nll_without_constants(
     ridge: &[f64],
 ) -> f64 {
     let size = 1.0 / dispersion;
-    let nll = counts
-        .iter()
-        .zip(design.iter())
-        .zip(size_factors.iter())
-        .map(|((&count, row), &size_factor)| {
-            let eta = DESEQ2_BETA_SCALE * row_dot(row, beta) + size_factor.ln();
-            let mu = eta.exp();
-            (count + size) * (size + mu).ln() - size * size.ln() - count * mu.ln()
-        })
-        .sum::<f64>();
-    let penalty = beta
-        .iter()
-        .zip(ridge.iter())
-        .map(|(&beta, &ridge)| 0.5 * ridge * beta * beta)
-        .sum::<f64>();
+    let nll = r_style_sum(
+        counts
+            .iter()
+            .zip(design.iter())
+            .zip(size_factors.iter())
+            .map(|((&count, row), &size_factor)| {
+                let mu = size_factor * r_pow2(row_dot(row, beta));
+                (count + size) * (size + mu).ln() - size * size.ln() - count * mu.ln()
+            }),
+    );
+    let penalty = 0.5
+        * r_style_sum(
+            beta.iter()
+                .zip(ridge.iter())
+                .map(|(&beta, &ridge)| (ridge * beta) * beta),
+        );
     nll + penalty
+}
+
+fn r_style_sum(values: impl IntoIterator<Item = f64>) -> f64 {
+    let values = values.into_iter().collect::<Vec<_>>();
+    if values.iter().any(|value| !value.is_finite()) {
+        return values.iter().copied().sum();
+    }
+    values
+        .into_iter()
+        .fold(ExtendedAccumulator::ZERO, ExtendedAccumulator::add_f64)
+        .to_f64()
+}
+
+/// Safe software model of the 64-bit-significand accumulator used by R's
+/// platform `long double`. Inputs are binary64 and every addition rounds to
+/// the x87 extended precision before the final binary64 conversion.
+#[derive(Debug, Clone, Copy)]
+struct ExtendedAccumulator {
+    negative: bool,
+    exponent: i32,
+    significand: u64,
+}
+
+impl ExtendedAccumulator {
+    const ZERO: Self = Self {
+        negative: false,
+        exponent: 0,
+        significand: 0,
+    };
+
+    fn from_f64(value: f64) -> Self {
+        debug_assert!(value.is_finite());
+        let bits = value.to_bits();
+        let negative = bits >> 63 != 0;
+        let exponent_field = ((bits >> 52) & 0x7ff) as i32;
+        let fraction = bits & ((1_u64 << 52) - 1);
+        if exponent_field == 0 {
+            if fraction == 0 {
+                return Self::ZERO;
+            }
+            let shift = fraction.leading_zeros();
+            return Self {
+                negative,
+                exponent: -1011 - shift as i32,
+                significand: fraction << shift,
+            };
+        }
+        Self {
+            negative,
+            exponent: exponent_field - 1023,
+            significand: ((1_u64 << 52) | fraction) << 11,
+        }
+    }
+
+    fn add_f64(self, value: f64) -> Self {
+        self.add(Self::from_f64(value))
+    }
+
+    fn add(self, other: Self) -> Self {
+        if self.significand == 0 {
+            return other;
+        }
+        if other.significand == 0 {
+            return self;
+        }
+
+        let (larger, smaller) = if self.exponent > other.exponent
+            || (self.exponent == other.exponent && self.significand >= other.significand)
+        {
+            (self, other)
+        } else {
+            (other, self)
+        };
+        let exponent_delta = (larger.exponent - smaller.exponent) as u32;
+        let larger_extended = (larger.significand as u128) << 3;
+        let smaller_extended = shift_right_jam((smaller.significand as u128) << 3, exponent_delta);
+        let mut exponent = larger.exponent;
+
+        let extended = if larger.negative == smaller.negative {
+            let mut sum = larger_extended + smaller_extended;
+            if sum >= 1_u128 << 67 {
+                sum = shift_right_jam(sum, 1);
+                exponent += 1;
+            }
+            sum
+        } else {
+            let mut difference = larger_extended - smaller_extended;
+            if difference == 0 {
+                return Self::ZERO;
+            }
+            while difference < 1_u128 << 66 {
+                difference <<= 1;
+                exponent -= 1;
+            }
+            difference
+        };
+
+        Self::round_extended(larger.negative, exponent, extended)
+    }
+
+    fn round_extended(negative: bool, mut exponent: i32, extended: u128) -> Self {
+        let mut significand = extended >> 3;
+        let round_bits = extended & 0b111;
+        if round_bits > 0b100 || (round_bits == 0b100 && significand & 1 != 0) {
+            significand += 1;
+        }
+        if significand >= 1_u128 << 64 {
+            significand >>= 1;
+            exponent += 1;
+        }
+        Self {
+            negative,
+            exponent,
+            significand: significand as u64,
+        }
+    }
+
+    fn to_f64(self) -> f64 {
+        if self.significand == 0 {
+            return 0.0;
+        }
+        let sign = (self.negative as u64) << 63;
+        if self.exponent > 1023 {
+            return f64::from_bits(sign | (0x7ff_u64 << 52));
+        }
+
+        if self.exponent >= -1022 {
+            let mut exponent = self.exponent;
+            let mut rounded = round_shift_nearest_even(self.significand as u128, 11);
+            if rounded >= 1_u128 << 53 {
+                rounded >>= 1;
+                exponent += 1;
+                if exponent > 1023 {
+                    return f64::from_bits(sign | (0x7ff_u64 << 52));
+                }
+            }
+            let exponent_bits = ((exponent + 1023) as u64) << 52;
+            let fraction = rounded as u64 & ((1_u64 << 52) - 1);
+            return f64::from_bits(sign | exponent_bits | fraction);
+        }
+
+        let shift = (-self.exponent - 1011) as u32;
+        let rounded = round_shift_nearest_even(self.significand as u128, shift);
+        if rounded >= 1_u128 << 52 {
+            return f64::from_bits(sign | (1_u64 << 52));
+        }
+        f64::from_bits(sign | rounded as u64)
+    }
+}
+
+fn shift_right_jam(value: u128, shift: u32) -> u128 {
+    if shift == 0 {
+        return value;
+    }
+    if shift >= 128 {
+        return u128::from(value != 0);
+    }
+    let discarded = value & ((1_u128 << shift) - 1);
+    (value >> shift) | u128::from(discarded != 0)
+}
+
+fn round_shift_nearest_even(value: u128, shift: u32) -> u128 {
+    if shift == 0 {
+        return value;
+    }
+    if shift >= 128 {
+        return 0;
+    }
+    let truncated = value >> shift;
+    let remainder = value & ((1_u128 << shift) - 1);
+    let halfway = 1_u128 << (shift - 1);
+    truncated + u128::from(remainder > halfway || (remainder == halfway && truncated & 1 != 0))
+}
+
+#[test]
+fn r_style_sum_retains_extended_precision_until_the_final_rounding() {
+    let half_f64_ulp_at_one = 2.0_f64.powi(-53);
+    assert_eq!(
+        r_style_sum([1.0, half_f64_ulp_at_one, half_f64_ulp_at_one]).to_bits(),
+        (1.0_f64 + 2.0_f64.powi(-52)).to_bits()
+    );
+    assert_eq!(r_style_sum([1.0e16, 1.0, -1.0e16]), 1.0);
+    assert_eq!(r_style_sum(std::iter::empty()), 0.0);
 }
 
 fn nb_nll_gradient(
@@ -475,8 +724,7 @@ fn nb_nll_gradient(
     let size = 1.0 / dispersion;
     let mut gradient = vec![0.0; beta.len()];
     for ((&count, row), &size_factor) in counts.iter().zip(design.iter()).zip(size_factors.iter()) {
-        let eta = DESEQ2_BETA_SCALE * row_dot(row, beta) + size_factor.ln();
-        let mu = eta.exp();
+        let mu = size_factor * r_pow2(row_dot(row, beta));
         let residual = (count + size) * mu / (size + mu) - count;
         for (target, &x) in gradient.iter_mut().zip(row.iter()) {
             *target += DESEQ2_BETA_SCALE * x * residual;
@@ -489,10 +737,36 @@ fn nb_nll_gradient(
 }
 
 fn row_dot(row: &[f64], beta: &[f64]) -> f64 {
-    row.iter()
-        .zip(beta.iter())
-        .map(|(&x, &parameter)| x * parameter)
-        .sum()
+    // The R 4.6.0 fixture generator uses a short-column OpenBLAS DGEMV.
+    // Preserve its four-column accumulation shape so the diagnostic scans
+    // optimizer behavior rather than differences in the replayed objective.
+    let mut sum = 0.0;
+    let mut index = 0;
+    while index + 4 <= row.len() {
+        let mut group = row[index] * beta[index];
+        group = row[index + 1].mul_add(beta[index + 1], group);
+        group = row[index + 2].mul_add(beta[index + 2], group);
+        group = row[index + 3].mul_add(beta[index + 3], group);
+        sum += group;
+        index += 4;
+    }
+    if index + 2 <= row.len() {
+        let group = row[index + 1].mul_add(beta[index + 1], row[index] * beta[index]);
+        sum += group;
+        index += 2;
+    }
+    if index < row.len() {
+        sum += row[index] * beta[index];
+    }
+    sum
+}
+
+#[inline(never)]
+fn r_pow2(exponent: f64) -> f64 {
+    // Keep LLVM from canonicalizing pow(2, x) to exp2(x) in release builds.
+    // The R 4.6.0 fixture objective uses pow, and the two libm entry points can
+    // differ by a few ulps in the finite-difference stencil.
+    std::hint::black_box(2.0_f64).powf(exponent)
 }
 
 fn projected_gradient_norm(x: &[f64], gradient: &[f64], lower: &[f64], upper: &[f64]) -> f64 {

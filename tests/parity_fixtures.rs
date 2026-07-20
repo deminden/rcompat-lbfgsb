@@ -138,6 +138,16 @@ fn fixtures_that_are_currently_at_float_noise_match_r() {
 }
 
 #[test]
+fn line_search_refresh_fixture_matches_r460() {
+    let fixture: Fixture = serde_json::from_str(include_str!(
+        "../fixtures/r_optim_lbfgsb/line_search_refresh_sin_quad.json"
+    ))
+    .unwrap();
+    let result = run_fixture(&fixture);
+    assert_fixture_close(&fixture, &result, 1e-8, 1e-10);
+}
+
+#[test]
 fn rosenbrock_fixture_matches_r() {
     let fixture: Fixture =
         serde_json::from_str(include_str!("../fixtures/r_optim_lbfgsb/rosenbrock.json")).unwrap();
@@ -533,10 +543,10 @@ fn run_fixture(fixture: &Fixture) -> OptimResult {
             fixture.initial_par.clone(),
             bounds,
             |p| {
+                let coupled = 0.3 * (7.0 * p.iter().sum::<f64>()).cos();
                 p.iter()
-                    .map(|x| 0.02 * x.powi(2) + (15.0 * x).sin())
+                    .map(|x| 0.02 * x.powi(2) + (15.0 * x).sin() + coupled)
                     .sum::<f64>()
-                    + 0.3 * p.len() as f64 * (7.0 * p.iter().sum::<f64>()).cos()
             },
             control,
         )

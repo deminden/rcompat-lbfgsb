@@ -23,12 +23,34 @@ const MIN_STEP: f64 = 1e-14;
 const MORE_THUENTE_BRACKET_SHRINK: f64 = 0.66;
 const MORE_THUENTE_FTOL: f64 = 1e-3;
 const MORE_THUENTE_XTRAPU: f64 = 4.0;
+const MORE_THUENTE_RETRY_RESTORE_BRACKET_RATIO: f64 = 0.1;
 const MORE_THUENTE_RETRY_WARNING_BRACKET_RATIO: f64 = 0.5;
 const R23_COMPACT_SUBSPACE_MAX_DIMENSION: usize = 10;
 const SUBSPACE_REFRESH_STEP_RATIO: f64 = 70.0;
 #[cfg(test)]
 const STRONG_WOLFE_UNBOUNDED_MAX_STEP: f64 = 1.0e20;
 const WOLFE_CURVATURE: f64 = 0.9;
+
+fn openblas_cooperlake_short_dot(left: &[f64], right: &[f64]) -> f64 {
+    debug_assert_eq!(left.len(), right.len());
+    let plain_end = left.len() - left.len() % 4;
+    let mut sum = 0.0;
+    for index in 0..plain_end {
+        sum += left[index] * right[index];
+    }
+    for index in plain_end..left.len() {
+        sum = left[index].mul_add(right[index], sum);
+    }
+    sum
+}
+
+fn compatibility_dot(exact_operations: bool, left: &[f64], right: &[f64]) -> f64 {
+    if exact_operations {
+        openblas_cooperlake_short_dot(left, right)
+    } else {
+        dot(left, right)
+    }
+}
 
 /// Native in-tree bounded limited-memory quasi-Newton backend.
 #[derive(Debug, Default)]
@@ -99,32 +121,28 @@ impl NativeBackend {
         let tolerant_initial_bound_count =
             tolerant_bound_count(&x, lower, upper, INITIAL_BOUND_ACTIVITY_TOL);
         let initial_projected_norm = projected_gradient_norm(&x, &gradient, lower, upper);
-        let factr_tolerance = effective_factr_tolerance(
+        let subspace_bound_activity =
+            BoundActivity::for_problem(control, initial.len(), lower, upper);
+        let finite_box = lower
+            .iter()
+            .zip(upper.iter())
+            .all(|(&lower, &upper)| lower.is_finite() && upper.is_finite());
+        let exact_compact_enabled = x.len() > 1 && finite_box && modes == BackendModes::default();
+        let run_controls = effective_run_controls(
             control,
+            exact_compact_enabled,
             x.len(),
             has_infinite_bound,
+            initial_bound_count,
             tolerant_initial_bound_count,
             value,
             initial_projected_norm,
         );
-        let effective_lmm = effective_lmm(
-            control,
-            x.len(),
-            has_infinite_bound,
-            initial_bound_count,
-            value,
-            initial_projected_norm,
-        );
-        let effective_maxit = effective_maxit(
-            control,
-            x.len(),
-            has_infinite_bound,
-            initial_bound_count,
-            value,
-            initial_projected_norm,
-        );
-        let subspace_bound_activity =
-            BoundActivity::for_problem(control, initial.len(), lower, upper);
+        let factr_tolerance = run_controls.factr_tolerance;
+        let effective_lmm = run_controls.lmm;
+        let effective_maxit = run_controls.maxit;
+        let mut exact_compact_state = exact_compact_enabled
+            .then(|| compact::ExactCompactState::new(initial.len(), effective_lmm, lower, upper));
 
         let min_step = min_step_for_modes(modes);
         let mut deferred_large_backtracked_factr_stop = false;
@@ -160,33 +178,24 @@ impl NativeBackend {
             }
 
             let mut restarted_after_line_search_failure = false;
-            let step = loop {
+            let (step, accepted_search_direction, accepted_initial_derivative) = loop {
                 maybe_trace_cauchy_point(&x, &gradient, lower, upper, &history, control);
 
-                let mut direction_choice = direction_with_mode(
-                    &x,
-                    &gradient,
-                    lower,
-                    upper,
-                    &history,
-                    DirectionSettings {
-                        mode: modes.direction,
-                        bound_activity: subspace_bound_activity,
-                        min_step,
-                    },
-                );
-                let can_refresh_subspace_memory =
-                    !control.has_user_gradient && x.len() > 1 && !has_infinite_bound;
-                if can_refresh_subspace_memory
-                    && direction_choice.refresh_history
-                    && memory_refreshes == 0
-                {
-                    if control.trace > 1 {
-                        eprintln!("lbfgs_memory_refresh=subspace_model");
-                    }
-                    history.clear();
-                    memory_refreshes += 1;
-                    direction_choice = direction_with_mode(
+                let mut direction_choice = if let Some(state) = exact_compact_state.as_mut() {
+                    state
+                        .direction(&x, &gradient, lower, upper, projected_norm, min_step)
+                        .or_else(|| {
+                            history.clear();
+                            state.clear_history();
+                            state.direction(&x, &gradient, lower, upper, projected_norm, min_step)
+                        })
+                        .unwrap_or_else(|| DirectionChoice {
+                            direction: steepest_projected_direction(&x, &gradient, lower, upper),
+                            unit_step_target: None,
+                            refresh_history: false,
+                        })
+                } else {
+                    direction_with_mode(
                         &x,
                         &gradient,
                         lower,
@@ -197,18 +206,62 @@ impl NativeBackend {
                             bound_activity: subspace_bound_activity,
                             min_step,
                         },
-                    );
+                    )
+                };
+                let can_refresh_subspace_memory = exact_compact_state.is_none()
+                    && !control.has_user_gradient
+                    && x.len() > 1
+                    && !has_infinite_bound;
+                if can_refresh_subspace_memory
+                    && direction_choice.refresh_history
+                    && memory_refreshes == 0
+                {
+                    if control.trace > 1 {
+                        eprintln!("lbfgs_memory_refresh=subspace_model");
+                    }
+                    history.clear();
+                    if let Some(state) = exact_compact_state.as_mut() {
+                        state.clear_history();
+                    }
+                    memory_refreshes += 1;
+                    direction_choice = if let Some(state) = exact_compact_state.as_mut() {
+                        state
+                            .direction(&x, &gradient, lower, upper, projected_norm, min_step)
+                            .unwrap_or_else(|| DirectionChoice {
+                                direction: steepest_projected_direction(
+                                    &x, &gradient, lower, upper,
+                                ),
+                                unit_step_target: None,
+                                refresh_history: false,
+                            })
+                    } else {
+                        direction_with_mode(
+                            &x,
+                            &gradient,
+                            lower,
+                            upper,
+                            &history,
+                            DirectionSettings {
+                                mode: modes.direction,
+                                bound_activity: subspace_bound_activity,
+                                min_step,
+                            },
+                        )
+                    };
                 }
                 let mut direction = direction_choice.direction;
                 let mut unit_step_target = direction_choice.unit_step_target;
 
-                let directional_derivative = dot(&gradient, &direction);
+                let directional_derivative =
+                    compatibility_dot(exact_compact_enabled, &gradient, &direction);
                 if directional_derivative >= 0.0 || norm_inf(&direction) <= min_step {
                     direction = steepest_projected_direction(&x, &gradient, lower, upper);
                     unit_step_target = None;
                 }
 
-                if dot(&gradient, &direction) >= 0.0 || norm_inf(&direction) <= min_step {
+                if compatibility_dot(exact_compact_enabled, &gradient, &direction) >= 0.0
+                    || norm_inf(&direction) <= min_step
+                {
                     if deferred_exact_zero_pgtol
                         && control.pgtol == 0.0
                         && has_infinite_bound
@@ -225,6 +278,12 @@ impl NativeBackend {
                     ));
                 }
 
+                let initial_derivative =
+                    compatibility_dot(exact_compact_enabled, &gradient, &direction);
+                let history_is_empty = exact_compact_state
+                    .as_ref()
+                    .map_or_else(|| history.is_empty(), |state| !state.has_history());
+
                 let request = LineSearchRequest {
                     x: &x,
                     value,
@@ -239,13 +298,14 @@ impl NativeBackend {
                     } else {
                         None
                     },
-                    cap_initial_unbounded_step: history.is_empty()
+                    cap_initial_unbounded_step: history_is_empty
                         && lower.iter().all(|value| value.is_infinite())
                         && upper.iter().all(|value| value.is_infinite()),
-                    initial_step_cap: initial_step_cap_for_modes(modes, history.is_empty()),
-                    allow_quadratic_interpolation: history.is_empty(),
+                    initial_step_cap: initial_step_cap_for_modes(modes, history_is_empty),
+                    allow_quadratic_interpolation: history_is_empty,
                     allow_retry_warning_accept: restarted_after_line_search_failure,
                     min_step,
+                    exact_operations: exact_compact_enabled,
                     quadratic_interpolation_damping: quadratic_interpolation_damping(
                         control,
                         x.len(),
@@ -260,14 +320,23 @@ impl NativeBackend {
                     iteration,
                 )?
                 else {
-                    if should_restart_after_line_search_failure(
-                        &history,
-                        restarted_after_line_search_failure,
-                    ) {
+                    let should_restart = exact_compact_state.as_ref().map_or_else(
+                        || {
+                            should_restart_after_line_search_failure(
+                                &history,
+                                restarted_after_line_search_failure,
+                            )
+                        },
+                        |state| !restarted_after_line_search_failure && state.has_history(),
+                    );
+                    if should_restart {
                         if control.trace > 1 {
                             eprintln!("lbfgs_memory_refresh=line_search");
                         }
                         history.clear();
+                        if let Some(state) = exact_compact_state.as_mut() {
+                            state.clear_history();
+                        }
                         restarted_after_line_search_failure = true;
                         continue;
                     }
@@ -280,7 +349,7 @@ impl NativeBackend {
                     });
                 };
 
-                break step;
+                break (step, direction, initial_derivative);
             };
 
             let relative_reduction = relative_objective_reduction(value, step.value);
@@ -296,24 +365,44 @@ impl NativeBackend {
             );
 
             let accepted_displacement = difference(&step.x, &x);
-            update_history(
-                &mut history,
-                effective_lmm,
-                accepted_displacement.clone(),
-                difference(&step.gradient, &gradient),
-                &gradient,
-            );
+            let gradient_difference = difference(&step.gradient, &gradient);
+            if let Some(state) = exact_compact_state.as_mut() {
+                let final_derivative = compatibility_dot(
+                    exact_compact_enabled,
+                    &step.gradient,
+                    &accepted_search_direction,
+                );
+                if !state.update(
+                    &accepted_search_direction,
+                    step.alpha,
+                    &gradient_difference,
+                    accepted_initial_derivative,
+                    final_derivative,
+                ) {
+                    history.clear();
+                    state.clear_history();
+                }
+            } else {
+                update_history(
+                    &mut history,
+                    effective_lmm,
+                    accepted_displacement.clone(),
+                    gradient_difference,
+                    &gradient,
+                );
+            }
 
             used_multidimensional_interpolation |= step.used_multidimensional_interpolation;
-            let accept_line_search_factr_stop = should_accept_line_search_factr_stop(
-                &step,
-                control.has_user_gradient,
-                x.len(),
-                has_infinite_bound,
-            );
+            let accept_line_search_factr_stop = exact_compact_enabled
+                || should_accept_line_search_factr_stop(
+                    &step,
+                    control.has_user_gradient,
+                    x.len(),
+                    has_infinite_bound,
+                );
             let deferred_from_previous_step = deferred_large_backtracked_factr_stop;
-            deferred_large_backtracked_factr_stop = factr_tolerance
-                .is_some_and(|tolerance| relative_reduction <= tolerance)
+            deferred_large_backtracked_factr_stop = !exact_compact_enabled
+                && factr_tolerance.is_some_and(|tolerance| relative_reduction <= tolerance)
                 && !accept_line_search_factr_stop;
             let stop_line_search_trials = step.line_search_trials;
             let stop_step_norm = step.step_norm;
@@ -348,22 +437,25 @@ impl NativeBackend {
 
             if factr_tolerance.is_some_and(|tolerance| relative_reduction <= tolerance)
                 && accept_line_search_factr_stop
-                && should_accept_factr_stop(
-                    next_projected_norm,
-                    control.has_user_gradient,
-                    x.len(),
-                    has_infinite_bound,
-                    initial_bound_count,
-                )
+                && (exact_compact_enabled
+                    || should_accept_factr_stop(
+                        next_projected_norm,
+                        control.has_user_gradient,
+                        x.len(),
+                        has_infinite_bound,
+                        initial_bound_count,
+                    ))
             {
-                if should_extrapolate_flat_tail_stop(
-                    deferred_from_previous_step,
-                    stop_line_search_trials,
-                    stop_step_norm,
-                    control.has_user_gradient,
-                    x.len(),
-                    has_infinite_bound,
-                ) {
+                if !exact_compact_enabled
+                    && should_extrapolate_flat_tail_stop(
+                        deferred_from_previous_step,
+                        stop_line_search_trials,
+                        stop_step_norm,
+                        control.has_user_gradient,
+                        x.len(),
+                        has_infinite_bound,
+                    )
+                {
                     let candidate = bounded_step(
                         &x,
                         &accepted_displacement,
@@ -505,6 +597,60 @@ fn quadratic_interpolation_damping(control: BackendControl, dimension: usize) ->
         1.0
     } else {
         INTERPOLATION_DAMPING
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct EffectiveRunControls {
+    factr_tolerance: Option<f64>,
+    lmm: usize,
+    maxit: usize,
+}
+
+#[allow(clippy::too_many_arguments)]
+fn effective_run_controls(
+    control: BackendControl,
+    exact_compact_enabled: bool,
+    dimension: usize,
+    has_infinite_bound: bool,
+    initial_bound_count: usize,
+    tolerant_initial_bound_count: usize,
+    initial_value: f64,
+    initial_projected_norm: f64,
+) -> EffectiveRunControls {
+    if exact_compact_enabled {
+        return EffectiveRunControls {
+            factr_tolerance: (control.factr > 0.0).then_some(control.factr * f64::EPSILON),
+            lmm: control.lmm,
+            maxit: control.maxit,
+        };
+    }
+
+    EffectiveRunControls {
+        factr_tolerance: effective_factr_tolerance(
+            control,
+            dimension,
+            has_infinite_bound,
+            tolerant_initial_bound_count,
+            initial_value,
+            initial_projected_norm,
+        ),
+        lmm: effective_lmm(
+            control,
+            dimension,
+            has_infinite_bound,
+            initial_bound_count,
+            initial_value,
+            initial_projected_norm,
+        ),
+        maxit: effective_maxit(
+            control,
+            dimension,
+            has_infinite_bound,
+            initial_bound_count,
+            initial_value,
+            initial_projected_norm,
+        ),
     }
 }
 
@@ -723,6 +869,7 @@ struct LineSearchRequest<'a> {
     allow_quadratic_interpolation: bool,
     allow_retry_warning_accept: bool,
     min_step: f64,
+    exact_operations: bool,
     quadratic_interpolation_damping: f64,
 }
 
@@ -844,7 +991,11 @@ where
         return Ok(None);
     }
     let initial_alpha = alpha;
-    let initial_directional_derivative = dot(request.gradient, request.direction);
+    let initial_directional_derivative = compatibility_dot(
+        request.exact_operations,
+        request.gradient,
+        request.direction,
+    );
     let mut tried_quadratic_step = false;
     let mut used_multidimensional_interpolation = false;
     let mut evaluated_candidates = 0_usize;
@@ -858,12 +1009,17 @@ where
             continue;
         }
 
-        let directional_decrease = dot(request.gradient, &step);
+        let directional_decrease =
+            compatibility_dot(request.exact_operations, request.gradient, &step);
         if directional_decrease < 0.0 {
             let evaluation = evaluate(problem, &candidate, counts)?;
             evaluated_candidates += 1;
             if evaluation.value <= request.value + ARMIJO * directional_decrease {
-                let directional_derivative = dot(&evaluation.gradient, request.direction);
+                let directional_derivative = compatibility_dot(
+                    request.exact_operations,
+                    &evaluation.gradient,
+                    request.direction,
+                );
                 let curvature_ratio = directional_derivative.abs()
                     / (-initial_directional_derivative).max(f64::MIN_POSITIVE);
                 return Ok(Some(Step {
@@ -959,7 +1115,11 @@ where
         alpha = alpha.min(cap);
     }
 
-    let initial_derivative = dot(request.gradient, request.direction);
+    let initial_derivative = compatibility_dot(
+        request.exact_operations,
+        request.gradient,
+        request.direction,
+    );
     if alpha <= 0.0 || !alpha.is_finite() || initial_derivative >= 0.0 {
         return Ok(None);
     }
@@ -983,7 +1143,10 @@ where
         // bracket using the modified stage-one objective when needed.
         let candidate = line_search_candidate(&request, alpha);
         let step = difference(&candidate, request.x);
-        if norm_inf(&step) <= request.min_step {
+        // The exact finite-box task still submits trials whose coordinates round
+        // back to x. Those evaluations advance the line-search warning state and
+        // are observable through R's function/gradient counts.
+        if !request.exact_operations && norm_inf(&step) <= request.min_step {
             alpha = if bracketed {
                 0.5 * (best.alpha + other.alpha)
             } else {
@@ -994,7 +1157,11 @@ where
 
         let evaluation = evaluate(problem, &candidate, counts)?;
         evaluated_candidates += 1;
-        let derivative = dot(&evaluation.gradient, request.direction);
+        let derivative = compatibility_dot(
+            request.exact_operations,
+            &evaluation.gradient,
+            request.direction,
+        );
         let point = MoreThuentePoint {
             alpha,
             value: evaluation.value,
@@ -1037,9 +1204,14 @@ where
                 used_multidimensional_interpolation: false,
             }));
         }
-        if request.allow_retry_warning_accept
-            && evaluation.value <= sufficient_decrease
-            && more_thuente_retry_warning(best.alpha, other.alpha, bracketed)
+        if evaluation.value <= sufficient_decrease
+            && more_thuente_accepts_warning(
+                request.exact_operations,
+                request.allow_retry_warning_accept,
+                best.alpha,
+                other.alpha,
+                bracketed,
+            )
         {
             return Ok(Some(Step {
                 x: candidate,
@@ -1125,6 +1297,18 @@ where
             previous_width = width;
             width = (other.alpha - best.alpha).abs();
         }
+        if more_thuente_restores_best(
+            request.exact_operations,
+            request.allow_retry_warning_accept,
+            best.alpha,
+            other.alpha,
+            bracketed,
+        ) {
+            // The exact task and a restarted search restore the best point once
+            // the bracket reaches warning width. The following task evaluates
+            // that point before accepting the warning as a successful iterate.
+            alpha = best.alpha;
+        }
 
         if alpha <= 0.0 || !alpha.is_finite() {
             return Ok(None);
@@ -1154,6 +1338,38 @@ fn more_thuente_retry_warning(best_alpha: f64, other_alpha: f64, bracketed: bool
     let step_max = best_alpha.max(other_alpha);
     step_max > 0.0
         && (other_alpha - best_alpha).abs() <= MORE_THUENTE_RETRY_WARNING_BRACKET_RATIO * step_max
+}
+
+fn more_thuente_retry_restore(best_alpha: f64, other_alpha: f64, bracketed: bool) -> bool {
+    if !bracketed {
+        return false;
+    }
+    let step_max = best_alpha.max(other_alpha);
+    step_max > 0.0
+        && (other_alpha - best_alpha).abs() <= MORE_THUENTE_RETRY_RESTORE_BRACKET_RATIO * step_max
+}
+
+fn more_thuente_accepts_warning(
+    exact_operations: bool,
+    allow_retry_warning_accept: bool,
+    best_alpha: f64,
+    other_alpha: f64,
+    bracketed: bool,
+) -> bool {
+    (exact_operations && more_thuente_retry_restore(best_alpha, other_alpha, bracketed))
+        || (allow_retry_warning_accept
+            && more_thuente_retry_warning(best_alpha, other_alpha, bracketed))
+}
+
+fn more_thuente_restores_best(
+    exact_operations: bool,
+    allow_retry_warning_accept: bool,
+    best_alpha: f64,
+    other_alpha: f64,
+    bracketed: bool,
+) -> bool {
+    (exact_operations || allow_retry_warning_accept)
+        && more_thuente_retry_restore(best_alpha, other_alpha, bracketed)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1725,6 +1941,15 @@ fn line_search_candidate(request: &LineSearchRequest<'_>, alpha: f64) -> Vec<f64
         if let Some(target) = request.unit_step_target {
             return target.to_vec();
         }
+    }
+
+    if request.exact_operations {
+        return request
+            .x
+            .iter()
+            .zip(request.direction.iter())
+            .map(|(&x_i, &d_i)| x_i + alpha * d_i)
+            .collect();
     }
 
     bounded_step(
