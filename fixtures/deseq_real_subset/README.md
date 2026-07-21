@@ -14,16 +14,13 @@ the committed design matrix, size factors, and selected count rows. The
 objective omits beta-independent constants so normal Rust tests do not need an
 R or DESeq runtime.
 
-The Rust test suite treats these sixty-eight cases as active parity checks for
+The Rust test suite treats these 68 cases as active parity checks for
 the multi-dimensional supplied-gradient path, covering seventeen actual
 optimizer-routed genes and fifty-one force-optimizer probes. The optimizer
-outputs were regenerated with R 4.6.0 on 2026-07-20; all 68 cases currently
+outputs were regenerated with R 4.6.1 on 2026-07-22; all 68 cases currently
 reproduce the saved parameters, values, counts, convergence codes, and messages
 bit-for-bit on the pinned callback arithmetic.
 
-For local ignored-data sweeps, regenerate with `DESEQ_FIXTURE_GENES=all` and run
-the DESeq test with `DESEQ_PARITY_SCAN=1`; normal test runs keep the strict
-per-case assertions. `DESEQ_PARITY_SCAN_VERBOSE=1` prints actual and expected
-parameters for failures, `DESEQ_TRACE_GENE=<gene>` emits objective-call traces,
-and `DESEQ_BACKEND_TRACE=<level>` enables the native backend trace during the
-Rust side of a probe.
+For broader local sweeps, regenerate with `DESEQ_FIXTURE_GENES=all` and run the
+DESeq test with `DESEQ_PARITY_SCAN=1`. Optional verbose and trace controls are
+documented alongside the test implementation.

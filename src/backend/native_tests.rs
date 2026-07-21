@@ -778,7 +778,8 @@ fn exact_line_search_candidate_keeps_feasible_bound_roundoff() {
         (candidate(true), candidate(false))
     }
 
-    // R 4.6.0 black-box traces: synthetic cases 0135/call 93 and 0370/call
+    // R 4.6.0 black-box traces, unchanged under R 4.6.1: synthetic cases
+    // 0135/call 93 and 0370/call
     // 109. The safeguarded scalar is already exact; the affine update retains
     // the one- or two-ULP bound overshoot, while the tolerant path clamps it.
     let (case_0135_exact, case_0135_clamped) = replay(

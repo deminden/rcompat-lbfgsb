@@ -1,6 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.2.1 - 2026-07-22
+
+### R 4.6.1 oracle refresh
+
+- Regenerated all 63 standard fixtures plus the DESeq supplied-gradient and
+  hard-real objective-only subsets with R 4.6.1. The update is metadata-only:
+  every saved numeric result, count, trace, status, message, and input is
+  unchanged from R 4.6.0.
+- Added a separately preserved R 4.6.1 stress bundle. Its 512 cases and all
+  payload files are byte-identical to the R 4.6.0 bundle, and zero-tolerance
+  Rust scans remain exact in debug and release builds.
 
 ## 0.2.0 - 2026-07-20
 

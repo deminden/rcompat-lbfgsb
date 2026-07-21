@@ -6,30 +6,21 @@ installed. They are committed so normal `cargo test` does not require R.
 Fixture data is a behavioral reference only. It must not contain copied R source
 code or implementation excerpts.
 
-All 63 JSON fixtures were most recently regenerated on 2026-07-20 with R 4.6.0
+All 63 JSON fixtures were most recently regenerated on 2026-07-22 with R 4.6.1
 (`x86_64-conda-linux-gnu`). The fixtures are portable test inputs; R and its
 BLAS are not required by normal Rust tests.
 
-The current fixture set covers simple quadratics, Rosenbrock, active lower and
-upper bounds, fixed parameters with supplied gradients, initial projected
-gradient convergence, infinite bounds, mixed finite/infinite bounds,
-projected out-of-range and infinite starting values, zero-dimensional no-op
-optimization, `fnscale`, `parscale`, `ndeps`, asymmetric finite-difference
-stencils near bounds, `factr = 0`, `pgtol`, `maxit`, multi-dimensional
-quadratics, fixed coordinates in multi-dimensional supplied-gradient problems,
-active box constraints, all-unbounded supplied-gradient problems, mixed-bound
-and half/all-unbounded finite differences, scaled bounds, combined `fnscale`/`parscale`
-supplied-gradient and finite-difference scaling, positive finite-difference
-`pgtol` at both initial and post-step convergence, R's bound-distance-capped
-projected-gradient norm near finite bounds, finite-difference `maxit` controls,
-`lmm` variants, objective-only finite-box Rosenbrock, and a Rosenbrock
-evaluation trace prefix for active main-path backend parity work.
-The lower-bound finite-difference trace pins R's raw bounded-stencil call order:
-forward point first, then the clamped base point.
-The `line_search_refresh_sin_quad` fixture pins a nonconvex finite-box
-objective-only case where R refreshes L-BFGS memory during line search and still
-returns `factr` convergence. Its result was regenerated with R 4.6.0; an exact
-raw-call replay confirmed all 220 objective invocations and the 44/44 public
-function/gradient counts.
+The set covers:
+
+- bounded, unbounded, mixed-bound, fixed-coordinate, and zero-dimensional
+  problems;
+- supplied gradients and R-shaped bounded finite differences;
+- `fnscale`, `parscale`, `ndeps`, `factr`, `pgtol`, `maxit`, and `lmm` controls;
+- projected starts, active bounds, evaluation counts, and convergence messages;
+- Rosenbrock evaluation traces and a nonconvex line-search memory-refresh case.
+
+Raw-call traces also guard user-visible finite-difference stencil order near
+bounds. Detailed generation and audit provenance is recorded in the repository
+`PROVENANCE.md`.
 
 Real-data DESeq-derived fixture subsets live in `fixtures/deseq_real_subset/`.

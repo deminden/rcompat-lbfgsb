@@ -9,9 +9,8 @@ without embedding or invoking R. It preserves familiar controls such as
 R-style parameters, objective value, evaluation counts, convergence code, and
 message.
 
-> **Current reference target:** R 4.6.0 on `x86_64-conda-linux-gnu`, using
-> single-threaded OpenBLAS 0.3.32. The full target stack and scope of the parity
-> claim are documented below.
+> **Current reference target:** R 4.6.1 on `x86_64-conda-linux-gnu`, using
+> single-threaded OpenBLAS 0.3.32.
 
 ## Current status
 
@@ -33,26 +32,23 @@ version follows the same floating-point path.
 ## Reference software stack
 
 The current fixtures and stress oracle were regenerated and verified on
-2026-07-20.
+2026-07-22.
 
 | Layer | Pinned reference |
 | --- | --- |
 | Public behavior | `stats::optim(method = "L-BFGS-B")` |
-| R | 4.6.0 (2026-04-24) |
+| R | 4.6.1 (2026-06-24) |
 | R platform | `x86_64-conda-linux-gnu` |
 | BLAS/LAPACK | OpenBLAS 0.3.32, `OPENBLAS_NUM_THREADS=1` |
 | Scientific fixture environment | Bioconductor 3.23, DESeq2 1.52.0 |
 | Fixture numeric serialization | `%.17g` with required binary64 round trips |
 | Rust validation toolchain | rustc/cargo 1.96.0, LLVM 22.1.2, `x86_64-unknown-linux-gnu` |
 
-The hard-real numeric input bundle originated under R 4.4.3 and DESeq2 1.46.0.
-Those workload inputs were intentionally retained, while their optimizer
-outputs were regenerated against the R 4.6.0 target. This keeps input-data
-provenance separate from the optimizer oracle version.
-
 R, Bioconductor, DESeq2, and OpenBLAS are development-time reference tools
 only. The crate has no runtime dependencies and does not call, link, shell out
-to, or embed any of them.
+to, or embed any of them. Detailed fixture origins, preserved comparison
+environments, and regeneration evidence are recorded in
+[Provenance](PROVENANCE.md).
 
 ## What is implemented
 
@@ -74,7 +70,7 @@ Add the crate:
 
 ```toml
 [dependencies]
-rcompat-lbfgsb = "0.2.0"
+rcompat-lbfgsb = "0.2.1"
 ```
 
 Optimize an objective without supplying a gradient:
@@ -123,7 +119,7 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo fmt --all -- --check
 ```
 
-When the ignored R 4.6.0 stress bundle is available locally, its exact scan can
+When the ignored R 4.6.1 stress bundle is available locally, its exact scan can
 also be run directly:
 
 ```sh
@@ -136,8 +132,8 @@ cargo test --release --test synthetic_stress_scan \
   synthetic_stress_can_scan_ignored_reference_data -- --nocapture
 ```
 
-The expected summary is 512/512 exact parameters and values, 512 exact count
-matches, and zero failures.
+The expected summary is 512/512 exact parameters, values, and counts, with zero
+failures.
 
 ## Scope and limitations
 

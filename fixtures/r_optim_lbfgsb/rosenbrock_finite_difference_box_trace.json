@@ -36,6 +36,6 @@
     "convergence": 0,
     "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
   },
-  "r_version": "R version 4.6.0 (2026-04-24)",
+  "r_version": "R version 4.6.1 (2026-06-24)",
   "platform": "x86_64-conda-linux-gnu"
 }

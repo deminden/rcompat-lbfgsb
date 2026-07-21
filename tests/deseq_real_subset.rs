@@ -554,7 +554,7 @@ fn openblas_cooperlake_crossprod_column(
 }
 
 fn row_dot(row: &[f64], beta: &[f64]) -> f64 {
-    // The R 4.6.0 generator evaluates `x %*% beta` through the configured
+    // The pinned R 4.6.1 generator evaluates `x %*% beta` through the configured
     // short-column OpenBLAS DGEMV. Reproduce its four-column accumulation so
     // this test isolates optimizer behavior from callback arithmetic.
     let mut sum = 0.0;

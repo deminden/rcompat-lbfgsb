@@ -8,7 +8,7 @@ use std::process::Command;
 
 use rcompat_lbfgsb::{optim_lbfgsb, Bounds, OptimControl};
 
-const DATA_ROOT: &str = "data/lbfgsb_synthetic_stress_2026-07-20";
+const DATA_ROOT: &str = "data/lbfgsb_synthetic_stress_2026-07-22";
 const DESEQ2_BETA_SCALE: f64 = std::f64::consts::LN_2;
 
 #[derive(Debug)]
@@ -272,12 +272,14 @@ fn synthetic_stress_can_scan_ignored_reference_data() {
 }
 
 #[test]
-fn synthetic_stress_can_replay_saved_r460_objectives_exactly() {
+fn synthetic_stress_can_replay_saved_r461_objectives_exactly() {
     if env::var_os("LBFGSB_SYNTHETIC_STRESS_OBJECTIVE_REPLAY").is_none() {
         return;
     }
 
-    let root = Path::new(DATA_ROOT);
+    let data_root =
+        env::var("LBFGSB_SYNTHETIC_STRESS_DATA_ROOT").unwrap_or_else(|_| DATA_ROOT.to_owned());
+    let root = Path::new(&data_root);
     assert!(
         root.exists(),
         "set the replay flag only when {DATA_ROOT} is available"
@@ -737,7 +739,7 @@ fn nb_nll_gradient(
 }
 
 fn row_dot(row: &[f64], beta: &[f64]) -> f64 {
-    // The R 4.6.0 fixture generator uses a short-column OpenBLAS DGEMV.
+    // The pinned R 4.6.1 fixture generator uses a short-column OpenBLAS DGEMV.
     // Preserve its four-column accumulation shape so the diagnostic scans
     // optimizer behavior rather than differences in the replayed objective.
     let mut sum = 0.0;
@@ -764,7 +766,7 @@ fn row_dot(row: &[f64], beta: &[f64]) -> f64 {
 #[inline(never)]
 fn r_pow2(exponent: f64) -> f64 {
     // Keep LLVM from canonicalizing pow(2, x) to exp2(x) in release builds.
-    // The R 4.6.0 fixture objective uses pow, and the two libm entry points can
+    // The pinned R 4.6.1 fixture objective uses pow, and the two libm entry points can
     // differ by a few ulps in the finite-difference stencil.
     std::hint::black_box(2.0_f64).powf(exponent)
 }

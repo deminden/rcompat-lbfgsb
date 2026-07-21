@@ -138,7 +138,7 @@ fn fixtures_that_are_currently_at_float_noise_match_r() {
 }
 
 #[test]
-fn line_search_refresh_fixture_matches_r460() {
+fn line_search_refresh_fixture_matches_r461() {
     let fixture: Fixture = serde_json::from_str(include_str!(
         "../fixtures/r_optim_lbfgsb/line_search_refresh_sin_quad.json"
     ))

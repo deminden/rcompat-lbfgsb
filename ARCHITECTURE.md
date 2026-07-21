@@ -61,8 +61,9 @@ More-Thuente path, the backend uses a coherent clean-room compact-matrix state
 shaped after the public L-BFGS-B algorithmic formulas. The same state and
 operation grouping apply to supplied-gradient and finite-difference problems;
 one-dimensional and mixed/infinite-bound finite-difference problems retain the
-older fallback path. Generated R 4.6.0 fixtures validate this routing across
-both callback forms and dimensions 4 through 13.
+older fallback path. Generated fixtures validate this routing across both
+callback forms and dimensions 4 through 13; the current oracle version and
+results are summarized in the README.
 
 The objective-only finite-box main path includes one early limited-memory
 refresh guard for the Cauchy/subspace model. R's bundled L-BFGS-B 2.3 can
@@ -101,8 +102,8 @@ abnormal termination.
 An exact finite-box More-Thuente task also restores and re-evaluates its stored
 best point when the bracket width is at most one tenth of the current step cap.
 The narrower threshold is distinct from the one-half retry-warning threshold;
-raw R 4.6.0 call traces and a captured-bit scalar regression test guard the
-distinction.
+black-box call traces and a captured-bit scalar regression test guard the
+distinction. Versioned trace provenance is recorded in `PROVENANCE.md`.
 
 The More-Thuente main path uses a machine-epsilon-scale minimum step so
 finite-bound supplied-gradient problems can take R's final tiny cleanup step
@@ -196,14 +197,12 @@ noise.
 The DESeq-derived real-data subset is also an active production expectation for
 multi-dimensional supplied-gradient parity. Its compact 4-D negative-binomial
 GLM cases include seventeen actual optimizer-routed genes and fifty-one
-force-optimizer probes. The R 4.6.0 replay and Rust test reproduce all 68 saved
-parameters, values, optimizer counts, convergence codes, and messages
-bit-for-bit on the pinned callback arithmetic.
+force-optimizer probes.
 
 The DESeq2 hard-real subset exercises objective-only finite-difference parity
-on 8 finite-box contrasts and 48 hard optimizer rows. The current main path
-reproduces every saved parameter, value, optimizer count, convergence code, and
-message bit-for-bit.
+on 8 finite-box contrasts and 48 hard optimizer rows. The README summarizes
+current parity results, while `PROVENANCE.md` records fixture origins and replay
+details.
 
 Setting `DESEQ_PARITY_SCAN=1` keeps the same test running through every case and
 prints per-gene errors for ignored-data scans. `DESEQ_PARITY_SCAN_VERBOSE=1`
