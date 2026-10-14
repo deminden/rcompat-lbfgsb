@@ -1,0 +1,1601 @@
+{
+  "fixture": "airway_GSE52778",
+  "contrasts": [
+    {
+      "contrast": "~cell + dex",
+      "samples": 8,
+      "coefficients": 5,
+      "coefficient_names": ["(Intercept)", "cellN061011", "cellN080611", "cellN61311", "dexuntrt"],
+      "design": [
+        [1, 0, 0, 1, 1],
+        [1, 0, 0, 1, 0],
+        [1, 0, 0, 0, 1],
+        [1, 0, 0, 0, 0],
+        [1, 0, 1, 0, 1],
+        [1, 0, 1, 0, 0],
+        [1, 1, 0, 0, 1],
+        [1, 1, 0, 0, 0]
+      ],
+      "size_factors": [1.0236476492670632, 0.89616672179392343, 1.1794861208167848, 0.67005382904820132, 1.1776713540502166, 1.3990364691534196, 0.92077868332816148, 0.94451408934091929],
+      "cases": [
+        {
+          "fixture": "~cell + dex:ENSG00000259278",
+          "gene": "ENSG00000259278",
+          "counts": [0, 0, 0, 0, 0, 9, 0, 1],
+          "dispersion": 7.3319814941807824,
+          "actual_optim_routed": true,
+          "initial_par": [
+            -0.89399222413274604,
+            1.1848293417261377,
+            3.3704851746825928,
+            -0.10757629320343459,
+            -2.7578092266076331
+          ],
+          "lower": [-30, -30, -30, -30, -30],
+          "upper": [30, 30, 30, 30, 30]
+        },
+        {
+          "fixture": "~cell + dex:ENSG00000161509",
+          "gene": "ENSG00000161509",
+          "counts": [3, 3, 2, 0, 7, 5, 1, 5],
+          "dispersion": 0.82489435545858658,
+          "actual_optim_routed": true,
+          "initial_par": [
+            0.34683339538911412,
+            1.5715323484820707,
+            1.8550636059787082,
+            1.3382428021448025,
+            0.023297866975626268
+          ],
+          "lower": [-30, -30, -30, -30, -30],
+          "upper": [30, 30, 30, 30, 30]
+        },
+        {
+          "fixture": "~cell + dex:ENSG00000211454",
+          "gene": "ENSG00000211454",
+          "counts": [10, 15, 5, 7, 7, 20, 9, 9],
+          "dispersion": 0.22512947804377739,
+          "actual_optim_routed": true,
+          "initial_par": [
+            3.16268203441434,
+            0.53742682285519738,
+            0.48960739395508363,
+            0.921041173956054,
+            -0.81604862732761874
+          ],
+          "lower": [-30, -30, -30, -30, -30],
+          "upper": [30, 30, 30, 30, 30]
+        },
+        {
+          "fixture": "~cell + dex:ENSG00000018236",
+          "gene": "ENSG00000018236",
+          "counts": [49, 49, 35, 40, 41, 61, 43, 48],
+          "dispersion": 0.060623922887547026,
+          "actual_optim_routed": true,
+          "initial_par": [
+            5.614708937292626,
+            0.1944607078871369,
+            -0.13089766901831229,
+            0.26577469423969508,
+            -0.40283087895347769
+          ],
+          "lower": [-30, -30, -30, -30, -30],
+          "upper": [30, 30, 30, 30, 30]
+        },
+        {
+          "fixture": "~cell + dex:ENSG00000231409",
+          "gene": "ENSG00000231409",
+          "counts": [245, 275, 232, 102, 209, 231, 130, 128],
+          "dispersion": 0.024012607615044985,
+          "actual_optim_routed": true,
+          "initial_par": [
+            7.4377458340689842,
+            -0.34295624872900665,
+            -0.035591707278130109,
+            0.63910298182926795,
+            0.034274954292186875
+          ],
+          "lower": [-30, -30, -30, -30, -30],
+          "upper": [30, 30, 30, 30, 30]
+        },
+        {
+          "fixture": "~cell + dex:ENSG00000171204",
+          "gene": "ENSG00000171204",
+          "counts": [647, 438, 635, 323, 502, 547, 524, 396],
+          "dispersion": 0.011399456092442027,
+          "actual_optim_routed": true,
+          "initial_par": [
+            8.8533211417539519,
+            -0.054703954835402843,
+            -0.31520874710814367,
+            0.13002151980461574,
+            0.27401679764575748
+          ],
+          "lower": [-30, -30, -30, -30, -30],
+          "upper": [30, 30, 30, 30, 30]
+        },
+        {
+          "fixture": "~cell + dex:ENSG00000164062",
+          "gene": "ENSG00000164062",
+          "counts": [1359, 1208, 1355, 753, 1420, 1928, 1018, 1098],
+          "dispersion": 0.0074884268241346393,
+          "actual_optim_routed": true,
+          "initial_par": [
+            10.184904089146441,
+            -0.00548801119817891,
+            0.18173746776859157,
+            0.23351516999089247,
+            -0.065177411873768062
+          ],
+          "lower": [-30, -30, -30, -30, -30],
+          "upper": [30, 30, 30, 30, 30]
+        },
+        {
+          "fixture": "~cell + dex:ENSG00000115414",
+          "gene": "ENSG00000115414",
+          "counts": [260262, 213986, 513766, 273878, 252667, 399841, 345651, 370450],
+          "dispersion": 0.011342556984077427,
+          "actual_optim_routed": true,
+          "initial_par": [
+            18.725987762858001,
+            -0.13942353065930013,
+            -0.76126313087194664,
+            -0.77614516939571709,
+            -0.073804478817000876
+          ],
+          "lower": [-30, -30, -30, -30, -30],
+          "upper": [30, 30, 30, 30, 30]
+        },
+        {
+          "fixture": "~cell + dex:ENSG00000179593",
+          "gene": "ENSG00000179593",
+          "counts": [0, 81, 0, 87, 0, 129, 0, 213],
+          "dispersion": 0.062310000803540697,
+          "actual_optim_routed": true,
+          "initial_par": [
+            7.0149408784838139,
+            0.84944106204833636,
+            -0.46204674855277078,
+            -0.48037989015051935,
+            -9.5315645423071249
+          ],
+          "lower": [-30, -30, -30, -30, -30],
+          "upper": [30, 30, 30, 30, 30]
+        },
+        {
+          "fixture": "~cell + dex:ENSG00000109906",
+          "gene": "ENSG00000109906",
+          "counts": [4, 739, 5, 429, 1, 581, 12, 1113],
+          "dispersion": 0.16773445712030327,
+          "actual_optim_routed": true,
+          "initial_par": [
+            9.375341221902028,
+            1.2469031418326748,
+            -0.80635688860880117,
+            0.21463722190352677,
+            -7.384662795724533
+          ],
+          "lower": [-30, -30, -30, -30, -30],
+          "upper": [30, 30, 30, 30, 30]
+        },
+        {
+          "fixture": "~cell + dex:ENSG00000250978",
+          "gene": "ENSG00000250978",
+          "counts": [1, 114, 2, 79, 0, 91, 3, 127],
+          "dispersion": 0.09236841660582136,
+          "actual_optim_routed": true,
+          "initial_par": [
+            6.9774654631510762,
+            0.41973896695311147,
+            -0.41153936677181108,
+            -0.03949250056927784,
+            -6.4384288799085256
+          ],
+          "lower": [-30, -30, -30, -30, -30],
+          "upper": [30, 30, 30, 30, 30]
+        },
+        {
+          "fixture": "~cell + dex:ENSG00000171819",
+          "gene": "ENSG00000171819",
+          "counts": [4, 50, 19, 543, 1, 10, 14, 1067],
+          "dispersion": 0.38738419258386014,
+          "actual_optim_routed": true,
+          "initial_par": [
+            9.5123221848617909,
+            0.34412423995426594,
+            -6.0836405235319821,
+            -3.1786101265975422,
+            -5.1538159095814153
+          ],
+          "lower": [-30, -30, -30, -30, -30],
+          "upper": [30, 30, 30, 30, 30]
+        },
+        {
+          "fixture": "~cell + dex:ENSG00000230522",
+          "gene": "ENSG00000230522",
+          "counts": [0, 10, 0, 0, 0, 0, 0, 0],
+          "dispersion": 7.7849002505903302,
+          "actual_optim_routed": true,
+          "initial_par": [
+            -0.85325016569723466,
+            -0.069087859575016106,
+            -0.52998316567507464,
+            5.3390251093711996,
+            -2.8392831863647636
+          ],
+          "lower": [-30, -30, -30, -30, -30],
+          "upper": [30, 30, 30, 30, 30]
+        },
+        {
+          "fixture": "~cell + dex:ENSG00000116721",
+          "gene": "ENSG00000116721",
+          "counts": [0, 11, 0, 0, 0, 0, 0, 0],
+          "dispersion": 7.1286946044993096,
+          "actual_optim_routed": true,
+          "initial_par": [
+            -0.79430303064237118,
+            -0.069085845345955216,
+            -0.52998146618983011,
+            5.5830391461966151,
+            -2.9571815793314991
+          ],
+          "lower": [-30, -30, -30, -30, -30],
+          "upper": [30, 30, 30, 30, 30]
+        }
+      ]
+    },
+    {
+      "contrast": "~dex",
+      "samples": 8,
+      "coefficients": 2,
+      "coefficient_names": ["(Intercept)", "dexuntrt"],
+      "design": [
+        [1, 1],
+        [1, 0],
+        [1, 1],
+        [1, 0],
+        [1, 1],
+        [1, 0],
+        [1, 1],
+        [1, 0]
+      ],
+      "size_factors": [1.0236476492670632, 0.89616672179392343, 1.1794861208167848, 0.67005382904820132, 1.1776713540502166, 1.3990364691534196, 0.92077868332816148, 0.94451408934091929],
+      "cases": [
+        {
+          "fixture": "~dex:ENSG00000259278",
+          "gene": "ENSG00000259278",
+          "counts": [0, 0, 0, 0, 0, 9, 0, 1],
+          "dispersion": 5.8538130034495586,
+          "actual_optim_routed": true,
+          "initial_par": [
+            3.191575324499182,
+            -5.7314321883990811
+          ],
+          "lower": [-30, -30],
+          "upper": [30, 30]
+        },
+        {
+          "fixture": "~dex:ENSG00000161509",
+          "gene": "ENSG00000161509",
+          "counts": [3, 3, 2, 0, 7, 5, 1, 5],
+          "dispersion": 0.58122300319254061,
+          "actual_optim_routed": true,
+          "initial_par": [
+            2.119184015043432,
+            -0.53290627262667478
+          ],
+          "lower": [-30, -30],
+          "upper": [30, 30]
+        },
+        {
+          "fixture": "~dex:ENSG00000211454",
+          "gene": "ENSG00000211454",
+          "counts": [10, 15, 5, 7, 7, 20, 9, 9],
+          "dispersion": 0.1418347095737853,
+          "actual_optim_routed": true,
+          "initial_par": [
+            3.6856375024995853,
+            -0.81269873328802944
+          ],
+          "lower": [-30, -30],
+          "upper": [30, 30]
+        },
+        {
+          "fixture": "~dex:ENSG00000018236",
+          "gene": "ENSG00000018236",
+          "counts": [49, 49, 35, 40, 41, 61, 43, 48],
+          "dispersion": 0.043136955001660857,
+          "actual_optim_routed": true,
+          "initial_par": [
+            5.6926223399871141,
+            -0.38843444131758914
+          ],
+          "lower": [-30, -30],
+          "upper": [30, 30]
+        },
+        {
+          "fixture": "~dex:ENSG00000231409",
+          "gene": "ENSG00000231409",
+          "counts": [245, 275, 232, 102, 209, 231, 130, 128],
+          "dispersion": 0.074706249578160328,
+          "actual_optim_routed": true,
+          "initial_par": [
+            7.5715519539413423,
+            -0.010972585583153803
+          ],
+          "lower": [-30, -30],
+          "upper": [30, 30]
+        },
+        {
+          "fixture": "~dex:ENSG00000171204",
+          "gene": "ENSG00000171204",
+          "counts": [647, 438, 635, 323, 502, 547, 524, 396],
+          "dispersion": 0.021852743724042365,
+          "actual_optim_routed": true,
+          "initial_par": [
+            8.7957064142846058,
+            0.28406525885345196
+          ],
+          "lower": [-30, -30],
+          "upper": [30, 30]
+        },
+        {
+          "fixture": "~dex:ENSG00000164062",
+          "gene": "ENSG00000164062",
+          "counts": [1359, 1208, 1355, 753, 1420, 1928, 1018, 1098],
+          "dispersion": 0.012178887655330053,
+          "actual_optim_routed": true,
+          "initial_par": [
+            10.292939952954018,
+            -0.067706614251508868
+          ],
+          "lower": [-30, -30],
+          "upper": [30, 30]
+        },
+        {
+          "fixture": "~dex:ENSG00000115414",
+          "gene": "ENSG00000115414",
+          "counts": [260262, 213986, 513766, 273878, 252667, 399841, 345651, 370450],
+          "dispersion": 0.065026632482147684,
+          "actual_optim_routed": true,
+          "initial_par": [
+            18.338565109435034,
+            -0.049924491322157413
+          ],
+          "lower": [-30, -30],
+          "upper": [30, 30]
+        },
+        {
+          "fixture": "~dex:ENSG00000179593",
+          "gene": "ENSG00000179593",
+          "counts": [0, 81, 0, 87, 0, 129, 0, 213],
+          "dispersion": 0.13543910004934157,
+          "actual_optim_routed": true,
+          "initial_par": [
+            7.0735269836179731,
+            -9.6133965879799952
+          ],
+          "lower": [-30, -30],
+          "upper": [30, 30]
+        },
+        {
+          "fixture": "~dex:ENSG00000109906",
+          "gene": "ENSG00000109906",
+          "counts": [4, 739, 5, 429, 1, 581, 12, 1113],
+          "dispersion": 0.14762709785841951,
+          "actual_optim_routed": true,
+          "initial_par": [
+            9.5818931786750365,
+            -7.1083584548432697
+          ],
+          "lower": [-30, -30],
+          "upper": [30, 30]
+        },
+        {
+          "fixture": "~dex:ENSG00000250978",
+          "gene": "ENSG00000250978",
+          "counts": [1, 114, 2, 79, 0, 91, 3, 127],
+          "dispersion": 0.092544771079424576,
+          "actual_optim_routed": true,
+          "initial_par": [
+            6.7912232756037358,
+            -6.137223542428182
+          ],
+          "lower": [-30, -30],
+          "upper": [30, 30]
+        },
+        {
+          "fixture": "~dex:ENSG00000171819",
+          "gene": "ENSG00000171819",
+          "counts": [4, 50, 19, 543, 1, 10, 14, 1067],
+          "dispersion": 1.8226784652494235,
+          "actual_optim_routed": true,
+          "initial_par": [
+            10.876691117195744,
+            -7.506268677845239
+          ],
+          "lower": [-30, -30],
+          "upper": [30, 30]
+        },
+        {
+          "fixture": "~dex:ENSG00000230522",
+          "gene": "ENSG00000230522",
+          "counts": [0, 10, 0, 0, 0, 0, 0, 0],
+          "dispersion": 9.0183921183068296,
+          "actual_optim_routed": true,
+          "initial_par": [
+            4.8541435016319916,
+            -7.3939813958362945
+          ],
+          "lower": [-30, -30],
+          "upper": [30, 30]
+        },
+        {
+          "fixture": "~dex:ENSG00000116721",
+          "gene": "ENSG00000116721",
+          "counts": [0, 11, 0, 0, 0, 0, 0, 0],
+          "dispersion": 8.676470794295831,
+          "actual_optim_routed": true,
+          "initial_par": [
+            5.5754851865198631,
+            -8.1153203888923748
+          ],
+          "lower": [-30, -30],
+          "upper": [30, 30]
+        }
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://bioconductor.org/packages/airway/",
+    "accession": "GSE52778",
+    "doi": "10.1371/journal.pone.0099625",
+    "package_version": "1.32.0",
+    "selection": "8 depth ranks, 4 largest treatment imbalances, 4 sparsest genes; deduplicated by count profile"
+  },
+  "reference": {
+    "fixture": "airway_GSE52778",
+    "r_version": "R version 4.6.1 (2026-06-24)",
+    "platform": "aarch64-apple-darwin20.0.0",
+    "bioconductor_version": "3.23",
+    "deseq2_version": "1.52.0",
+    "interface": "DESeq2::nbinomWaldTest(modelMatrix=..., useOptim=TRUE)",
+    "maxit": 1,
+    "results": [
+      {
+        "fixture": "~cell + dex:ENSG00000259278",
+        "contrast": "~cell + dex",
+        "gene": "ENSG00000259278",
+        "beta": [
+          -13.63205134509886,
+          13.714769678767958,
+          16.316717970412331,
+          -7.6213439503952083,
+          -17.441592230618809
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 16.421233564015026,
+        "optimizer_start": [
+          -0.89399222413274604,
+          1.1848293417261377,
+          3.3704851746825928,
+          -0.10757629320343459,
+          -2.7578092266076331
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 39.13347965108273,
+        "objective_offset_endpoint": 39.133970289453899,
+        "optimizer_result": {
+          "par": [
+            -13.63205134509886,
+            13.714769678767958,
+            16.316717970412331,
+            -7.6213439503952083,
+            -17.441592230618809
+          ],
+          "value": 46.084210235407362,
+          "counts": [
+            23,
+            23
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~cell + dex:ENSG00000161509",
+        "contrast": "~cell + dex",
+        "gene": "ENSG00000161509",
+        "beta": [
+          -0.061955548228711022,
+          1.7244560736667081,
+          2.274737405093294,
+          1.6837771036513747,
+          0.05502863116317222
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 33.601182600806268,
+        "optimizer_start": [
+          0.34683339538911412,
+          1.5715323484820707,
+          1.8550636059787082,
+          1.3382428021448025,
+          0.023297866975626268
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 39.133472972286498,
+        "objective_offset_endpoint": 39.133474556009546,
+        "optimizer_result": {
+          "par": [
+            -0.061955548228711022,
+            1.7244560736667081,
+            2.274737405093294,
+            1.6837771036513747,
+            0.05502863116317222
+          ],
+          "value": 55.93406585641268,
+          "counts": [
+            13,
+            13
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~cell + dex:ENSG00000211454",
+        "contrast": "~cell + dex",
+        "gene": "ENSG00000211454",
+        "beta": [
+          3.1624072896985793,
+          0.53746293486151886,
+          0.48924985155969464,
+          0.92099889471752339,
+          -0.81546897068501534
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 42.994854849750368,
+        "optimizer_start": [
+          3.16268203441434,
+          0.53742682285519738,
+          0.48960739395508363,
+          0.921041173956054,
+          -0.81604862732761874
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 39.133475083610477,
+        "objective_offset_endpoint": 39.133475082074192,
+        "optimizer_result": {
+          "par": [
+            3.1624072896985793,
+            0.53746293486151886,
+            0.48924985155969464,
+            0.92099889471752339,
+            -0.81546897068501534
+          ],
+          "value": 60.630902506949376,
+          "counts": [
+            5,
+            5
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~cell + dex:ENSG00000018236",
+        "contrast": "~cell + dex",
+        "gene": "ENSG00000018236",
+        "beta": [
+          5.6144034111536181,
+          0.19393260359587647,
+          -0.13118863842529102,
+          0.26531925240750093,
+          -0.40160513196618813
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 57.231360916008995,
+        "optimizer_start": [
+          5.614708937292626,
+          0.1944607078871369,
+          -0.13089766901831229,
+          0.26577469423969508,
+          -0.40283087895347769
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 39.133484967341303,
+        "objective_offset_endpoint": 39.133484964947534,
+        "optimizer_result": {
+          "par": [
+            5.6144034111536181,
+            0.19393260359587647,
+            -0.13118863842529102,
+            0.26531925240750093,
+            -0.40160513196618813
+          ],
+          "value": 67.749165422952032,
+          "counts": [
+            6,
+            6
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~cell + dex:ENSG00000231409",
+        "contrast": "~cell + dex",
+        "gene": "ENSG00000231409",
+        "beta": [
+          7.4378134621767833,
+          -0.3429099024418984,
+          -0.03547896259723312,
+          0.63850006638008472,
+          0.034204862889326351
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 72.247454173824195,
+        "optimizer_start": [
+          7.4377458340689842,
+          -0.34295624872900665,
+          -0.035591707278130109,
+          0.63910298182926795,
+          0.034274954292186875
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 39.13349698522218,
+        "objective_offset_endpoint": 39.133496985317741,
+        "optimizer_result": {
+          "par": [
+            7.4378134621767833,
+            -0.3429099024418984,
+            -0.03547896259723312,
+            0.63850006638008472,
+            0.034204862889326351
+          ],
+          "value": 75.257224072229832,
+          "counts": [
+            6,
+            6
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~cell + dex:ENSG00000171204",
+        "contrast": "~cell + dex",
+        "gene": "ENSG00000171204",
+        "beta": [
+          8.8533326676364617,
+          -0.054703833020126671,
+          -0.31520191291509375,
+          0.1300248460305832,
+          0.27394908786289435
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 80.665167395206822,
+        "optimizer_start": [
+          8.8533211417539519,
+          -0.054703954835402843,
+          -0.31520874710814367,
+          0.13002151980461574,
+          0.27401679764575748
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 39.133508348751612,
+        "objective_offset_endpoint": 39.133508348833374,
+        "optimizer_result": {
+          "par": [
+            8.8533326676364617,
+            -0.054703833020126671,
+            -0.31520191291509375,
+            0.1300248460305832,
+            0.27394908786289435
+          ],
+          "value": 79.466092046436785,
+          "counts": [
+            4,
+            4
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~cell + dex:ENSG00000164062",
+        "contrast": "~cell + dex",
+        "gene": "ENSG00000164062",
+        "beta": [
+          10.184898765674763,
+          -0.0054892508266772078,
+          0.18171334721985724,
+          0.23352245425986567,
+          -0.065173716311557398
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 91.004329700723559,
+        "optimizer_start": [
+          10.184904089146441,
+          -0.00548801119817891,
+          0.18173746776859157,
+          0.23351516999089247,
+          -0.065177411873768062
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 39.133520972987718,
+        "objective_offset_endpoint": 39.133520972930583,
+        "optimizer_result": {
+          "par": [
+            10.184898765674763,
+            -0.0054892508266772078,
+            0.18171334721985724,
+            0.23352245425986567,
+            -0.065173716311557398
+          ],
+          "value": 84.635685823292363,
+          "counts": [
+            3,
+            3
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~cell + dex:ENSG00000115414",
+        "contrast": "~cell + dex",
+        "gene": "ENSG00000115414",
+        "beta": [
+          18.725793032239409,
+          -0.13945861520117614,
+          -0.7613354026003285,
+          -0.77618321391418765,
+          -0.073357522588580401
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 185.13623903782565,
+        "optimizer_start": [
+          18.725987762858001,
+          -0.13942353065930013,
+          -0.76126313087194664,
+          -0.77614516939571709,
+          -0.073804478817000876
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 39.13364499564733,
+        "objective_offset_endpoint": 39.133644992057398,
+        "optimizer_result": {
+          "par": [
+            18.725793032239409,
+            -0.13945861520117614,
+            -0.7613354026003285,
+            -0.77618321391418765,
+            -0.073357522588580401
+          ],
+          "value": 131.70176451097021,
+          "counts": [
+            5,
+            5
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~cell + dex:ENSG00000179593",
+        "contrast": "~cell + dex",
+        "gene": "ENSG00000179593",
+        "beta": [
+          7.0206256785761223,
+          0.79645331104583594,
+          -0.49378275948452566,
+          -0.52257362378811589,
+          -23.986298141955658
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 38.933184026988862,
+        "optimizer_start": [
+          7.0149408784838139,
+          0.84944106204833636,
+          -0.46204674855277078,
+          -0.48037989015051935,
+          -9.5315645423071249
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 39.133539673894205,
+        "objective_offset_endpoint": 39.133781952397023,
+        "optimizer_result": {
+          "par": [
+            7.0206256785761223,
+            0.79645331104583594,
+            -0.49378275948452566,
+            -0.52257362378811589,
+            -23.986298141955658
+          ],
+          "value": 56.630930441994217,
+          "counts": [
+            34,
+            34
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~cell + dex:ENSG00000109906",
+        "contrast": "~cell + dex",
+        "gene": "ENSG00000109906",
+        "beta": [
+          9.3587240254785833,
+          1.2234381379433321,
+          -0.90251097592690954,
+          0.22417759594035389,
+          -7.352605782456064
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 69.99396384908124,
+        "optimizer_start": [
+          9.375341221902028,
+          1.2469031418326748,
+          -0.80635688860880117,
+          0.21463722190352677,
+          -7.384662795724533
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 39.133541401591877,
+        "objective_offset_endpoint": 39.133541064988904,
+        "optimizer_result": {
+          "par": [
+            9.3587240254785833,
+            1.2234381379433321,
+            -0.90251097592690954,
+            0.22417759594035389,
+            -7.352605782456064
+          ],
+          "value": 74.130522989529524,
+          "counts": [
+            12,
+            12
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~cell + dex:ENSG00000250978",
+        "contrast": "~cell + dex",
+        "gene": "ENSG00000250978",
+        "beta": [
+          6.9117185807182357,
+          0.32541732834303605,
+          -1.0058874594106666,
+          0.010827364601181083,
+          -6.3265839619198045
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 46.106868607349696,
+        "optimizer_start": [
+          6.9774654631510762,
+          0.41973896695311147,
+          -0.41153936677181108,
+          -0.03949250056927784,
+          -6.4384288799085256
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 39.133514303681977,
+        "objective_offset_endpoint": 39.133513518604865,
+        "optimizer_result": {
+          "par": [
+            6.9117185807182357,
+            0.32541732834303605,
+            -1.0058874594106666,
+            0.010827364601181083,
+            -6.3265839619198045
+          ],
+          "value": 62.186947822279706,
+          "counts": [
+            16,
+            16
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~cell + dex:ENSG00000171819",
+        "contrast": "~cell + dex",
+        "gene": "ENSG00000171819",
+        "beta": [
+          9.4182219520142407,
+          0.29270482275070431,
+          -6.1295828847568075,
+          -3.0701230503417816,
+          -5.0806129751754865
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 65.130304324566652,
+        "optimizer_start": [
+          9.5123221848617909,
+          0.34412423995426594,
+          -6.0836405235319821,
+          -3.1786101265975422,
+          -5.1538159095814153
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 39.133551200312866,
+        "objective_offset_endpoint": 39.133549860259521,
+        "optimizer_result": {
+          "par": [
+            9.4182219520142407,
+            0.29270482275070431,
+            -6.1295828847568075,
+            -3.0701230503417816,
+            -5.0806129751754865
+          ],
+          "value": 71.893256468035247,
+          "counts": [
+            12,
+            12
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~cell + dex:ENSG00000230522",
+        "contrast": "~cell + dex",
+        "gene": "ENSG00000230522",
+        "beta": [
+          -14.252679810194618,
+          -3.4181420736228758,
+          -3.7589310594546199,
+          17.732199964520746,
+          -18.73210657295704
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 12.239166450588668,
+        "optimizer_start": [
+          -0.85325016569723466,
+          -0.069087859575016106,
+          -0.52998316567507464,
+          5.3390251093711996,
+          -2.8392831863647636
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 39.133487851138682,
+        "objective_offset_endpoint": 39.133916198370031,
+        "optimizer_result": {
+          "par": [
+            -14.252679810194618,
+            -3.4181420736228758,
+            -3.7589310594546199,
+            17.732199964520746,
+            -18.73210657295704
+          ],
+          "value": 43.825953216456398,
+          "counts": [
+            29,
+            29
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~cell + dex:ENSG00000116721",
+        "contrast": "~cell + dex",
+        "gene": "ENSG00000116721",
+        "beta": [
+          -14.04168327268439,
+          -4.9215630550632818,
+          -5.4541377399997177,
+          17.658921134860957,
+          -18.437777205616769
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 12.41865089900547,
+        "optimizer_start": [
+          -0.79430303064237118,
+          -0.069085845345955216,
+          -0.52998146618983011,
+          5.5830391461966151,
+          -2.9571815793314991
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 39.133489476843806,
+        "objective_offset_endpoint": 39.133920524631272,
+        "optimizer_result": {
+          "par": [
+            -14.04168327268439,
+            -4.9215630550632818,
+            -5.4541377399997177,
+            17.658921134860957,
+            -18.437777205616769
+          ],
+          "value": 43.852458776658686,
+          "counts": [
+            29,
+            29
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~dex:ENSG00000259278",
+        "contrast": "~dex",
+        "gene": "ENSG00000259278",
+        "beta": [
+          0.94391470096840802,
+          -17.833612060306695
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 17.088629037888296,
+        "optimizer_start": [
+          3.191575324499182,
+          -5.7314321883990811
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 15.653409142107607,
+        "objective_offset_endpoint": 15.653547088720659,
+        "optimizer_result": {
+          "par": [
+            0.94391470096840802,
+            -17.833612060306695
+          ],
+          "value": 23.26322285347468,
+          "counts": [
+            22,
+            22
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~dex:ENSG00000161509",
+        "contrast": "~dex",
+        "gene": "ENSG00000161509",
+        "beta": [
+          1.6642957476111897,
+          -0.10179346908781192
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 34.252110155167834,
+        "optimizer_start": [
+          2.119184015043432,
+          -0.53290627262667478
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 15.65339001183861,
+        "objective_offset_endpoint": 15.653389014494746,
+        "optimizer_result": {
+          "par": [
+            1.6642957476111897,
+            -0.10179346908781192
+          ],
+          "value": 32.779444092078663,
+          "counts": [
+            7,
+            7
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~dex:ENSG00000211454",
+        "contrast": "~dex",
+        "gene": "ENSG00000211454",
+        "beta": [
+          3.6849257900320582,
+          -0.81228960008415207
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 42.422164130683434,
+        "optimizer_start": [
+          3.6856375024995853,
+          -0.81269873328802944
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 15.653394746575135,
+        "objective_offset_endpoint": 15.653394743619852,
+        "optimizer_result": {
+          "par": [
+            3.6849257900320582,
+            -0.81228960008415207
+          ],
+          "value": 36.86447680896157,
+          "counts": [
+            16,
+            16
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~dex:ENSG00000018236",
+        "contrast": "~dex",
+        "gene": "ENSG00000018236",
+        "beta": [
+          5.6925893563668275,
+          -0.38844252045001848
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 57.136786448684447,
+        "optimizer_start": [
+          5.6926223399871141,
+          -0.38843444131758914
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 15.653403902788831,
+        "objective_offset_endpoint": 15.653403902604207,
+        "optimizer_result": {
+          "par": [
+            5.6925893563668275,
+            -0.38844252045001848
+          ],
+          "value": 44.221797126946427,
+          "counts": [
+            3,
+            3
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~dex:ENSG00000231409",
+        "contrast": "~dex",
+        "gene": "ENSG00000231409",
+        "beta": [
+          7.5693917632875936,
+          -0.0090517195942925194
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 85.271840185579066,
+        "optimizer_start": [
+          7.5715519539413423,
+          -0.010972585583153803
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 15.653416288633323,
+        "objective_offset_endpoint": 15.653416272260429,
+        "optimizer_result": {
+          "par": [
+            7.5693917632875936,
+            -0.0090517195942925194
+          ],
+          "value": 58.289336365049948,
+          "counts": [
+            6,
+            6
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~dex:ENSG00000171204",
+        "contrast": "~dex",
+        "gene": "ENSG00000171204",
+        "beta": [
+          8.7956855940696954,
+          0.28404358434338034
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 88.862642110974747,
+        "optimizer_start": [
+          8.7957064142846058,
+          0.28406525885345196
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 15.653426346945835,
+        "objective_offset_endpoint": 15.653426346756532,
+        "optimizer_result": {
+          "par": [
+            8.7956855940696954,
+            0.28404358434338034
+          ],
+          "value": 60.084747402243906,
+          "counts": [
+            3,
+            3
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~dex:ENSG00000164062",
+        "contrast": "~dex",
+        "gene": "ENSG00000164062",
+        "beta": [
+          10.292926669622657,
+          -0.067708434552129229
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 97.665507677350462,
+        "optimizer_start": [
+          10.292939952954018,
+          -0.067706614251508868
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 15.653440598972153,
+        "objective_offset_endpoint": 15.653440598835566,
+        "optimizer_result": {
+          "par": [
+            10.292926669622657,
+            -0.067708434552129229
+          ],
+          "value": 64.486194437510775,
+          "counts": [
+            3,
+            3
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~dex:ENSG00000115414",
+        "contrast": "~dex",
+        "gene": "ENSG00000115414",
+        "beta": [
+          18.337972343519933,
+          -0.050423610123658681
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 203.52994574860077,
+        "optimizer_start": [
+          18.338565109435034,
+          -0.049924491322157413
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 15.65355577710497,
+        "objective_offset_endpoint": 15.653555766259728,
+        "optimizer_result": {
+          "par": [
+            18.337972343519933,
+            -0.050423610123658681
+          ],
+          "value": 117.41852864056011,
+          "counts": [
+            4,
+            4
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~dex:ENSG00000179593",
+        "contrast": "~dex",
+        "gene": "ENSG00000179593",
+        "beta": [
+          7.0698696873287972,
+          -23.982653526876909
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 45.844554813865123,
+        "optimizer_start": [
+          7.0735269836179731,
+          -9.6133965879799952
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 15.653458850462588,
+        "objective_offset_endpoint": 15.653700199737415,
+        "optimizer_result": {
+          "par": [
+            7.0698696873287972,
+            -23.982653526876909
+          ],
+          "value": 36.640822043908393,
+          "counts": [
+            26,
+            26
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~dex:ENSG00000109906",
+        "contrast": "~dex",
+        "gene": "ENSG00000109906",
+        "beta": [
+          9.5783346681205845,
+          -7.1761261409894663
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 79.413598349314455,
+        "optimizer_start": [
+          9.5818931786750365,
+          -7.1083584548432697
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 15.653458795092028,
+        "objective_offset_endpoint": 15.653459245014332,
+        "optimizer_result": {
+          "par": [
+            9.5783346681205845,
+            -7.1761261409894663
+          ],
+          "value": 55.360258419671553,
+          "counts": [
+            6,
+            6
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~dex:ENSG00000250978",
+        "contrast": "~dex",
+        "gene": "ENSG00000250978",
+        "beta": [
+          6.7906189029868003,
+          -6.3001983356098652
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 51.029660433712415,
+        "optimizer_start": [
+          6.7912232756037358,
+          -6.137223542428182
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 15.653429517486821,
+        "objective_offset_endpoint": 15.653430526875702,
+        "optimizer_result": {
+          "par": [
+            6.7906189029868003,
+            -6.3001983356098652
+          ],
+          "value": 41.168260743731906,
+          "counts": [
+            7,
+            7
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~dex:ENSG00000171819",
+        "contrast": "~dex",
+        "gene": "ENSG00000171819",
+        "beta": [
+          8.9677167359189784,
+          -5.7968225175943138
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 83.105477336305697,
+        "optimizer_start": [
+          10.876691117195744,
+          -7.506268677845239
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 15.653474947613176,
+        "objective_offset_endpoint": 15.653444635920998,
+        "optimizer_result": {
+          "par": [
+            8.9677167359189784,
+            -5.7968225175943138
+          ],
+          "value": 57.206183304073846,
+          "counts": [
+            10,
+            10
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~dex:ENSG00000230522",
+        "contrast": "~dex",
+        "gene": "ENSG00000230522",
+        "beta": [
+          1.4787071029863732,
+          -18.755822337364357
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 13.623377190503621,
+        "optimizer_start": [
+          4.8541435016319916,
+          -7.3939813958362945
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 15.653426741208627,
+        "objective_offset_endpoint": 15.653564608096744,
+        "optimizer_result": {
+          "par": [
+            1.4787071029863732,
+            -18.755822337364357
+          ],
+          "value": 21.708418670220329,
+          "counts": [
+            25,
+            25
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      },
+      {
+        "fixture": "~dex:ENSG00000116721",
+        "contrast": "~dex",
+        "gene": "ENSG00000116721",
+        "beta": [
+          1.6166356178297256,
+          -18.312265379500495
+        ],
+        "beta_converged": true,
+        "beta_iterations": 1,
+        "deviance": 13.918645625949628,
+        "optimizer_start": [
+          5.5754851865198631,
+          -8.1153203888923748
+        ],
+        "optimizer_has_gradient": false,
+        "optimizer_method": "L-BFGS-B",
+        "optimizer_lower": -30,
+        "optimizer_upper": 30,
+        "optimizer_control": [],
+        "objective_offset_start": 15.653436096603658,
+        "objective_offset_endpoint": 15.653556600660643,
+        "optimizer_result": {
+          "par": [
+            1.6166356178297256,
+            -18.312265379500495
+          ],
+          "value": 21.840764905580482,
+          "counts": [
+            22,
+            22
+          ],
+          "convergence": 0,
+          "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+        }
+      }
+    ]
+  }
+}

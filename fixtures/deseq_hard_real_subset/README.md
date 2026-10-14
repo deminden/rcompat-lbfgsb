@@ -7,16 +7,37 @@ The source bundle was originally produced with R 4.4.3 and DESeq2 1.46.0. The
 committed optimizer outputs were replayed on 2026-07-22 with the current
 reference stack: R 4.6.1, Bioconductor 3.23, and DESeq2 1.52.0.
 
-The fixture does not depend on DESeq2 at test time and does not copy DESeq2 or
-R source. It stores portable numeric inputs and exact outputs from a direct
-objective-only `stats::optim(method = "L-BFGS-B")` replay of an independently
-written negative-binomial GLM objective. This matches DESeq2's fallback
-optimizer shape.
+`deseq2_r461_nbinomWaldTest.json` is a second, same-version baseline produced
+by the installed DESeq2 1.52.0 package under R 4.6.1. It records fits from the
+public `DESeq2::nbinomWaldTest()` interface, including its coefficients,
+convergence flag, iteration count, deviance, and the actual `stats::optim`
+inputs and outputs. This captures wrapper initialization and integration
+behavior that the objective-only replay below does not. Two force-optimizer
+probes are included for diagnosis but are marked as not routed through
+optimization in the source analysis.
 
-The Rust regression test requires tight endpoint and objective agreement for
-all rows. All 48 rows reproduce R's
-parameters, values, optimizer-level counts, convergence status, and message
-bit-for-bit.
+The same-version Rust comparison replays the 46 routed fits from their captured
+DESeq2 starting coefficients, using objective-only finite differences and the
+full negative-binomial likelihood plus DESeq2's `N(0, 1000^2)` coefficient
+prior. The prior includes both its normalization constant and its quadratic
+term. This reduces the worst coefficient delta from `6.24` for the likelihood-
+only objective to `0.0153` (about `408x`); 45 of 46 rows are within `5e-3`.
+The remaining LCE3D case is the largest at `0.0153`, despite a maximum start
+difference of `319.35` between the original saved replay and the public
+DESeq2 wrapper. The original objective-only R parity fixtures remain unchanged
+and continue to check the generic optimizer's existing R behavior.
+
+The fixtures do not depend on DESeq2 at test time and do not copy DESeq2 or R
+source. They store portable numeric inputs and outputs from a direct
+objective-only `stats::optim(method = "L-BFGS-B")` replay and from the public
+DESeq2 interface.
+
+The Rust regression test keeps the original objective-only route separate from
+the public-package comparison above. Its diagnostic scan currently reports
+47 of 48 exact optimizer-count matches; the largest parameter delta is
+`3.44e-4` and the largest objective delta is `9.56e-7`. One existing hard row
+differs by one function and gradient evaluation while reaching a nearly
+identical endpoint.
 
 Selection is intentionally small: for each completed contrast, the generator
 keeps six unique-gene hard rows, preferring the highest-ranked actual optimizer
@@ -28,6 +49,15 @@ cases per contrast with:
 
 ```sh
 Rscript scripts/generate_hard_real_fixtures.R
+```
+
+With R 4.6.1 and DESeq2 1.52.0 installed, regenerate the public-package
+baseline with:
+
+```sh
+Rscript scripts/baseline_deseq2_r461.R \
+  fixtures/deseq_hard_real_subset/optim_cases.json \
+  fixtures/deseq_hard_real_subset/deseq2_r461_nbinomWaldTest.json
 ```
 
 Set `HARD_REAL_CASES_PER_CONTRAST` to change the compact subset size. The

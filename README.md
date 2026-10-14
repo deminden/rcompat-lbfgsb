@@ -14,7 +14,8 @@ message.
 
 ## Current status
 
-The active compatibility suite passes in both debug and release builds.
+On the pinned x86 reference stack, the compatibility suite passes in both
+debug and release builds. CPU and compiler arithmetic matter for exact parity.
 
 | Validation set | Coverage | Current result |
 | --- | ---: | --- |
@@ -22,7 +23,7 @@ The active compatibility suite passes in both debug and release builds.
 | DESeq-derived supplied-gradient GLMs | 68 cases | Bit-exact parameters, values, counts, convergence, and messages |
 | Hard objective-only GLMs | 48 cases across 8 contrasts | Bit-exact parameters, values, counts, convergence, and messages |
 | Synthetic finite-box stress suite | 512 cases | Bit-exact in debug and release |
-| Frozen worst-case precision gate | 100 cases | 100/100 improve by at least 10x; all finish with zero endpoint error |
+| Frozen worst-case precision comparison | 100 cases | All 100 finish with zero endpoint error |
 
 Here, **bit-exact** means equality of the serialized IEEE-754 result fields and
 the public optimizer bookkeeping on the pinned reference inputs. It is not a
@@ -70,7 +71,7 @@ Add the crate:
 
 ```toml
 [dependencies]
-rcompat-lbfgsb = "0.2.1"
+rcompat-lbfgsb = "0.2.2"
 ```
 
 Optimize an objective without supplying a gradient:
@@ -95,6 +96,47 @@ fn main() -> Result<(), OptimError> {
 For an analytic gradient, use `optim_lbfgsb_with_gradient` with the same
 `Bounds` and `OptimControl` types.
 
+## Real DESeq2 precision on macOS ARM
+
+The optional `arm-fma` feature models the scalar multiply-add contraction of
+the R 4.6.1 Clang build and the measured OpenBLAS 0.3.34 Vortex short-dot
+reduction. Enable it explicitly for that reference profile; default arithmetic
+continues to target the pinned x86 stack.
+
+The independent [DESeq2 objective example](examples/support/deseq2_objective.rs)
+retains the actual log2 link, full NB likelihood, Gaussian coefficient prior,
+captured starts, and default optimizer controls. Stable deviance/Stirling
+formulas avoid large log-gamma cancellation. Neither the example nor the
+optimizer invokes R, and no runtime dependency was added.
+
+Against real R 4.6.1 / DESeq2 1.52.0 fits on macOS ARM:
+
+| Cohort | Fits | Previous worst coefficient error | New worst | Improvement |
+| --- | ---: | ---: | ---: | ---: |
+| Existing hard real inputs | 46 | 0.0152846 | 0.00139872 | 10.9x |
+| Published airway counts, GSE52778 | 28 | 0.818664 | 0.00000376263 | 217,578x |
+
+These compare against the frozen full-likelihood/prior callback, not the
+historical reduced objective. The largest observed per-fit error increase is
+`1.18e-7`. Both worst-case improvements were reproduced in debug and release.
+This is a result for these cohorts and reference
+profile, not a universal bit-exact DESeq2 claim.
+
+The previous-callback numerical benchmark runs on its macOS ARM oracle
+platform. Fixture contract checks run on every platform.
+
+```sh
+cargo test --features arm-fma --test deseq2_precision
+cargo test --release --features arm-fma --test deseq2_precision
+cargo run --features arm-fma --example deseq2
+```
+
+[Generate the published-count fixtures](scripts/generate_airway_fixtures.R)
+with the separate `deseq2-r461` environment. Rust replay needs neither R nor
+network access. On the current ARM host, the older x86-pinned suite has known
+CELA3A and sine/quadratic evaluation-count differences; those assertions
+remain unchanged.
+
 ## R-compatible semantics
 
 - User objective and gradient closures always receive parameters in user scale.
@@ -113,8 +155,9 @@ For an analytic gradient, use `optim_lbfgsb_with_gradient` with the same
 Normal validation does not require R:
 
 ```sh
-cargo test --all-targets --all-features
-cargo test --release --all-targets --all-features
+cargo test --all-targets
+cargo test --release --all-targets
+cargo test --features arm-fma --test deseq2_precision
 cargo clippy --all-targets --all-features -- -D warnings
 cargo fmt --all -- --check
 ```

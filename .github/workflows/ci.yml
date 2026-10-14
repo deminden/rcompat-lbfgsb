@@ -24,7 +24,7 @@ jobs:
       - name: Lints
         run: cargo clippy --all-targets --all-features -- -D warnings
       - name: Tests
-        run: cargo test --all-features
+        run: cargo test
       - name: Docs
         env:
           RUSTDOCFLAGS: -D warnings
@@ -33,15 +33,29 @@ jobs:
         run: |
           package_files="$(mktemp)"
           cargo package --list --allow-dirty > "$package_files"
-          if grep -E '^(external|data|target)/' "$package_files"; then
+          if grep -E '^(external|data|target|\.codex-local)/' "$package_files"; then
             echo "Ignored inspection/data/build paths must not be packaged." >&2
             exit 1
           fi
           cargo package --allow-dirty
 
+  arm_fma:
+    name: macOS ARM precision
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: ARM unit tests
+        run: cargo test --features arm-fma --lib
+      - name: DESeq2 precision gates
+        run: cargo test --features arm-fma --test deseq2_precision
+      - name: Release precision gates
+        run: cargo test --release --features arm-fma --test deseq2_precision
+
   publish:
     name: Deploy to crates.io
-    needs: rust
+    needs: [rust, arm_fma]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     concurrency:

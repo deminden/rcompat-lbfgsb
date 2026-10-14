@@ -33,7 +33,13 @@ const WOLFE_CURVATURE: f64 = 0.9;
 
 fn openblas_cooperlake_short_dot(left: &[f64], right: &[f64]) -> f64 {
     debug_assert_eq!(left.len(), right.len());
-    let plain_end = left.len() - left.len() % 4;
+    // The pinned x86 oracle accumulates plain four-element blocks; the
+    // separately measured ARM/Vortex oracle contracts every short-dot term.
+    let plain_end = if cfg!(feature = "arm-fma") {
+        0
+    } else {
+        left.len() - left.len() % 4
+    };
     let mut sum = 0.0;
     for index in 0..plain_end {
         sum += left[index] * right[index];
@@ -49,6 +55,17 @@ fn compatibility_dot(exact_operations: bool, left: &[f64], right: &[f64]) -> f64
         openblas_cooperlake_short_dot(left, right)
     } else {
         dot(left, right)
+    }
+}
+
+fn reference_mul_add(a: f64, b: f64, c: f64) -> f64 {
+    // An independently written C probe compiled with the ARM R oracle's
+    // configured Clang/CFLAGS contracts these expressions. Rust does not
+    // implicitly contract them. Keep the x86 profile as the default.
+    if cfg!(feature = "arm-fma") {
+        a.mul_add(b, c)
+    } else {
+        a * b + c
     }
 }
 
@@ -1948,7 +1965,7 @@ fn line_search_candidate(request: &LineSearchRequest<'_>, alpha: f64) -> Vec<f64
             .x
             .iter()
             .zip(request.direction.iter())
-            .map(|(&x_i, &d_i)| x_i + alpha * d_i)
+            .map(|(&x_i, &d_i)| reference_mul_add(alpha, d_i, x_i))
             .collect();
     }
 
@@ -1972,7 +1989,9 @@ fn bounded_step(
         .zip(direction.iter())
         .zip(lower.iter())
         .zip(upper.iter())
-        .map(|(((&x_i, &d_i), &lower_i), &upper_i)| (x_i + alpha * d_i).clamp(lower_i, upper_i))
+        .map(|(((&x_i, &d_i), &lower_i), &upper_i)| {
+            (reference_mul_add(alpha, d_i, x_i)).clamp(lower_i, upper_i)
+        })
         .collect()
 }
 

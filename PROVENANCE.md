@@ -71,6 +71,20 @@ new floating-point paths and should be validated with new fixtures.
 subsets may be copied into `fixtures/` when they are needed for compatibility
 tests and are not implementation source.
 
+`fixtures/deseq_airway/` adds a self-contained published-count source that does
+not require the ignored historical bundle. `scripts/generate_airway_fixtures.R`
+loads airway 1.32.0 (GEO GSE52778; Himes et al., 2014,
+<https://doi.org/10.1371/journal.pone.0099625>), estimates size factors and
+dispersions through the public DESeq2 API, and selects 14 distinct count
+profiles by expression depth, treatment imbalance, and sparsity. It captures
+28 paired/unpaired public `nbinomWaldTest` fits through
+`scripts/baseline_deseq2_r461.R`. A single IRLS iteration deliberately triggers
+the actual fallback; the nested optimizer retains its default controls. The
+JSON records its R/DESeq2 versions and oracle platform. This new oracle runs
+on `aarch64-apple-darwin20.0.0`; it is not silently mixed with the older pinned
+x86 reference. No R or DESeq2 implementation text is included, and no R
+runtime dependency is introduced.
+
 The current `fixtures/deseq_real_subset/` data was selected from `data/` by
 `scripts/generate_r_fixtures.R`. It contains a compact set of numeric DESeq
 workflow outputs and R `optim` results for an independently written standard
@@ -155,6 +169,34 @@ status. The DESeq test replay models the recorded platform's extended-precision
 `sum()` and permissively licensed OpenBLAS DGEMV reduction shapes so callback
 arithmetic is not mistaken for optimizer drift. No runtime dependency on R or
 OpenBLAS was added.
+
+## macOS ARM DESeq2 precision profile
+
+The optional `arm-fma` arithmetic profile was validated against R 4.6.1,
+DESeq2 1.52.0 and OpenBLAS 0.3.34 Vortex on macOS ARM. Public BLAS dot-product
+probes established sequential fused short-dot reduction. An independently
+written C multiplication/addition probe, built using the installed R
+environment's Clang 23.1.3 and configured CFLAGS, demonstrated scalar `fmadd`
+contraction. Only our own probe's assembly was inspected. No R implementation
+source or compiled implementation was used as a source for these changes.
+
+The callback in `examples/support/deseq2_objective.rs` independently uses
+[Loader's published saddlepoint formulas](https://people.math.ethz.ch/~maechler/doc/CLoader-dbinom-2002.pdf)
+and the mathematical log-gamma power series obtained by integrating the
+[NIST DLMF psi series](https://dlmf.nist.gov/5.7#E4). Integer Stirling and zeta
+constants are mathematical values, not fitted gene-specific constants.
+Gamma recurrence yields the positive remainder increment
+`sum(t^(2k)/(2k+1))`, with `t=1/(2z+1)`. Our mathematical implementation
+does not use the paper's code appendix, R/DESeq2 source, or a runtime oracle.
+
+`fixtures/deseq2_precision_baseline.json` freezes per-fit coefficient errors
+from the previous naive full-NB/Gaussian-prior Rust callback using default
+optimizer arithmetic, compared with the captured actual package fits. It is
+a previous Rust accuracy baseline, not another R oracle. Across the 74 fits,
+the measured worst coefficient errors are `0.00139872` (old 46; 10.9x improvement)
+and `3.76263e-6` (published 28; 217,578x improvement), in both debug and release.
+The largest observed individual error increase is `1.18e-7`. Legacy x86 fixture assertions are
+preserved; the ARM mode is opt-in and tested against its own oracle.
 
 ## Dependency policy
 

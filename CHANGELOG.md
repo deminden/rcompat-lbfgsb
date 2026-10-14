@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.2.2 - 2026-10-14
+
+### macOS ARM arithmetic and real DESeq2 precision
+
+- Added opt-in `arm-fma` arithmetic for the measured R 4.6.1 macOS ARM
+  Clang/OpenBLAS Vortex profile. The default pinned x86 arithmetic remains
+  available without enabling the feature; public controls are unchanged.
+- Added a reusable, independent full negative-binomial/prior objective and
+  a runnable DESeq2 example, without adding runtime dependencies.
+- Reduced worst coefficient error across 46 existing actual DESeq2 fits from
+  `0.0152846` to `0.00139872` (10.9x), and across 28 published airway fits
+  from `0.818664` to `3.76263e-6` (217,578x). Both results were reproduced in
+  debug and release. The largest observed per-fit error increase is `1.18e-7`.
+- Added compact public-API fixture generation from airway/GSE52778 counts,
+  real DESeq2 fallback capture, and comparisons with the frozen previous callback.
+- Documented platform-specific validation and retained the existing strict
+  x86 fixture assertions, including their known count differences on ARM.
+- Split CI validation by arithmetic profile: default x86 tests on Linux,
+  focused `arm-fma` precision tests on macOS ARM, with both required before
+  the existing tagged publish job can run.
+
 ## 0.2.1 - 2026-07-22
 
 ### R 4.6.1 oracle refresh
@@ -22,8 +43,8 @@
   cases, and all 512 ignored synthetic stress cases.
 - Added a coherent clean-room compact Cauchy/subspace state, exact finite-box
   operation grouping, and R-shaped More-Thuente task-warning restoration. The
-  immutable worst-100 stress gate now clears its requested 10x precision gain
-  on 100/100 cases with zero endpoint error and no regressions.
+  all 100 cases in the frozen worst-case stress comparison now have zero
+  endpoint error, with no regressions.
 - Reworked the public documentation around the pinned R/OpenBLAS target stack,
   the evidence-bounded meaning of bit-exact parity, reproducible validation,
   and current limitations.

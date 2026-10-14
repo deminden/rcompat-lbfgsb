@@ -588,7 +588,7 @@ impl ExactCompactState {
                 for index in 0..row {
                     sum += self.sy[row][index] * self.sy[column][index] / self.sy[index][index];
                 }
-                self.wt[row][column] = sum + self.theta * self.ss[row][column];
+                self.wt[row][column] = reference_mul_add(self.theta, self.ss[row][column], sum);
             }
         }
         coherent_cholesky_upper_in_place(&mut self.wt, 0, self.col).is_some()
@@ -696,11 +696,13 @@ impl ExactCompactState {
             }
 
             direction[index] = neggi;
-            f1 -= neggi * neggi;
+            f1 = reference_mul_add(-neggi, neggi, f1);
             let mut pointer = self.head;
             for history_index in 0..self.col {
-                p[history_index] += self.wy[pointer][index] * neggi;
-                p[self.col + history_index] += self.ws[pointer][index] * neggi;
+                p[history_index] =
+                    reference_mul_add(self.wy[pointer][index], neggi, p[history_index]);
+                p[self.col + history_index] =
+                    reference_mul_add(self.ws[pointer][index], neggi, p[self.col + history_index]);
                 pointer = (pointer + 1) % self.memory;
             }
 
@@ -903,7 +905,7 @@ impl ExactCompactState {
         let mut reduced = vec![0.0; nfree];
         for (slot, value) in reduced.iter_mut().enumerate() {
             let index = self.index[slot];
-            *value = -self.theta * (cauchy[index] - x[index]) - gradient[index];
+            *value = reference_mul_add(-self.theta, cauchy[index] - x[index], -gradient[index]);
         }
         if self.col == 0 {
             return Some(reduced);
@@ -916,7 +918,8 @@ impl ExactCompactState {
             let a2 = self.theta * middle[self.col + history_index];
             for (slot, value) in reduced.iter_mut().enumerate() {
                 let index = self.index[slot];
-                *value += self.wy[pointer][index] * a1 + self.ws[pointer][index] * a2;
+                *value +=
+                    reference_mul_add(self.wy[pointer][index], a1, self.ws[pointer][index] * a2);
             }
             pointer = (pointer + 1) % self.memory;
         }
@@ -950,12 +953,24 @@ impl ExactCompactState {
                 let mut sy_active = 0.0;
                 for slot in 0..partition.nfree {
                     let index = self.index[slot];
-                    yy_free += self.wy[newest_storage][index] * self.wy[previous_storage][index];
+                    yy_free = reference_mul_add(
+                        self.wy[newest_storage][index],
+                        self.wy[previous_storage][index],
+                        yy_free,
+                    );
                 }
                 for slot in partition.nfree..self.n {
                     let index = self.index[slot];
-                    ss_active += self.ws[newest_storage][index] * self.ws[previous_storage][index];
-                    sy_active += self.ws[newest_storage][index] * self.wy[previous_storage][index];
+                    ss_active = reference_mul_add(
+                        self.ws[newest_storage][index],
+                        self.ws[previous_storage][index],
+                        ss_active,
+                    );
+                    sy_active = reference_mul_add(
+                        self.ws[newest_storage][index],
+                        self.wy[previous_storage][index],
+                        sy_active,
+                    );
                 }
                 self.wn1[newest_logical][previous_logical] = yy_free;
                 self.wn1[m + newest_logical][m + previous_logical] = ss_active;
@@ -968,7 +983,11 @@ impl ExactCompactState {
                 let mut sy_free = 0.0;
                 for slot in 0..partition.nfree {
                     let index = self.index[slot];
-                    sy_free += self.ws[row_storage][index] * self.wy[newest_storage][index];
+                    sy_free = reference_mul_add(
+                        self.ws[row_storage][index],
+                        self.wy[newest_storage][index],
+                        sy_free,
+                    );
                 }
                 self.wn1[m + row_logical][newest_logical] = sy_free;
                 row_storage = (row_storage + 1) % m;
@@ -986,13 +1005,29 @@ impl ExactCompactState {
                 let mut ss_leave = 0.0;
                 for slot in 0..partition.nenter {
                     let index = self.indx2[slot];
-                    yy_enter += self.wy[row_storage][index] * self.wy[column_storage][index];
-                    ss_enter += self.ws[row_storage][index] * self.ws[column_storage][index];
+                    yy_enter = reference_mul_add(
+                        self.wy[row_storage][index],
+                        self.wy[column_storage][index],
+                        yy_enter,
+                    );
+                    ss_enter = reference_mul_add(
+                        self.ws[row_storage][index],
+                        self.ws[column_storage][index],
+                        ss_enter,
+                    );
                 }
                 for slot in partition.ileave..self.n {
                     let index = self.indx2[slot];
-                    yy_leave += self.wy[row_storage][index] * self.wy[column_storage][index];
-                    ss_leave += self.ws[row_storage][index] * self.ws[column_storage][index];
+                    yy_leave = reference_mul_add(
+                        self.wy[row_storage][index],
+                        self.wy[column_storage][index],
+                        yy_leave,
+                    );
+                    ss_leave = reference_mul_add(
+                        self.ws[row_storage][index],
+                        self.ws[column_storage][index],
+                        ss_leave,
+                    );
                 }
                 self.wn1[row_logical][column_logical] += yy_enter - yy_leave;
                 self.wn1[m + row_logical][m + column_logical] += -ss_enter + ss_leave;
@@ -1009,11 +1044,19 @@ impl ExactCompactState {
                 let mut sy_leave = 0.0;
                 for slot in 0..partition.nenter {
                     let index = self.indx2[slot];
-                    sy_enter += self.ws[row_storage][index] * self.wy[column_storage][index];
+                    sy_enter = reference_mul_add(
+                        self.ws[row_storage][index],
+                        self.wy[column_storage][index],
+                        sy_enter,
+                    );
                 }
                 for slot in partition.ileave..self.n {
                     let index = self.indx2[slot];
-                    sy_leave += self.ws[row_storage][index] * self.wy[column_storage][index];
+                    sy_leave = reference_mul_add(
+                        self.ws[row_storage][index],
+                        self.wy[column_storage][index],
+                        sy_leave,
+                    );
                 }
                 if row_logical <= column_logical {
                     self.wn1[m + row_logical][column_logical] += sy_enter - sy_leave;
@@ -1078,8 +1121,8 @@ impl ExactCompactState {
             let mut s_dot = 0.0;
             for (slot, &direction_value) in direction.iter().take(nfree).enumerate() {
                 let index = self.index[slot];
-                y_dot += self.wy[pointer][index] * direction_value;
-                s_dot += self.ws[pointer][index] * direction_value;
+                y_dot = reference_mul_add(self.wy[pointer][index], direction_value, y_dot);
+                s_dot = reference_mul_add(self.ws[pointer][index], direction_value, s_dot);
             }
             wv[history_index] = y_dot;
             wv[col + history_index] = self.theta * s_dot;
@@ -1095,8 +1138,11 @@ impl ExactCompactState {
         for history_index in 0..col {
             for (slot, value) in direction.iter_mut().take(nfree).enumerate() {
                 let index = self.index[slot];
-                *value += self.wy[pointer][index] * wv[history_index] / self.theta
-                    + self.ws[pointer][index] * wv[col + history_index];
+                *value += reference_mul_add(
+                    self.ws[pointer][index],
+                    wv[col + history_index],
+                    self.wy[pointer][index] * wv[history_index] / self.theta,
+                );
             }
             pointer = (pointer + 1) % self.memory;
         }
@@ -1124,7 +1170,7 @@ impl ExactCompactState {
         }
         for (slot, &step) in direction.iter().take(nfree).enumerate() {
             let index = self.index[slot];
-            point[index] += alpha * step;
+            point[index] = reference_mul_add(alpha, step, point[index]);
         }
         Some(point)
     }
@@ -1187,7 +1233,7 @@ fn coherent_cholesky_upper_in_place(
                 - openblas_cooperlake_short_dot(&left, &right);
             value /= matrix[offset + row][offset + row];
             matrix[offset + row][offset + column] = value;
-            squared_norm += value * value;
+            squared_norm = reference_mul_add(value, value, squared_norm);
         }
         let pivot = matrix[offset + column][offset + column] - squared_norm;
         if pivot <= 0.0 || !pivot.is_finite() {

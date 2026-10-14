@@ -1,0 +1,306 @@
+{
+  "description": "Frozen naive full-NB plus Gaussian-prior Rust callback; original default optimizer arithmetic. Compare against captured real DESeq2 starts/endpoints, not the reduced historical objective.",
+  "r_version": "4.6.1",
+  "deseq2_version": "1.52.0",
+  "r_platform": "aarch64-apple-darwin20.0.0",
+  "old_cases": 46,
+  "airway_cases": 28,
+  "cases": [
+    {
+      "fixture": "deseq_hard_heart_blocked_permutation_rep01_mtnd1p23",
+      "max_coefficient_error": 0.0030858044084269842
+    },
+    {
+      "fixture": "deseq_hard_heart_blocked_permutation_rep01_sh2d5",
+      "max_coefficient_error": 1.17322033199585e-08
+    },
+    {
+      "fixture": "deseq_hard_heart_blocked_permutation_rep01_cela3b",
+      "max_coefficient_error": 1.9230408376813557e-09
+    },
+    {
+      "fixture": "deseq_hard_heart_blocked_permutation_rep01_cela3a",
+      "max_coefficient_error": 6.339149546397138e-07
+    },
+    {
+      "fixture": "deseq_hard_heart_blocked_permutation_rep01_gkn2",
+      "max_coefficient_error": 9.72437241841817e-10
+    },
+    {
+      "fixture": "deseq_hard_heart_full_blocked_permutation_rep01_mtnd1p23",
+      "max_coefficient_error": 4.238585437299491e-06
+    },
+    {
+      "fixture": "deseq_hard_heart_full_blocked_permutation_rep01_sh2d5",
+      "max_coefficient_error": 3.65083012709988e-08
+    },
+    {
+      "fixture": "deseq_hard_heart_full_blocked_permutation_rep01_cela3b",
+      "max_coefficient_error": 0.0011437274647350115
+    },
+    {
+      "fixture": "deseq_hard_heart_full_blocked_permutation_rep01_cela3a",
+      "max_coefficient_error": 4.246983682842931e-06
+    },
+    {
+      "fixture": "deseq_hard_heart_full_blocked_permutation_rep01_gstm1",
+      "max_coefficient_error": 3.246512625765252e-05
+    },
+    {
+      "fixture": "deseq_hard_kidney_blocked_permutation_rep01_mtnd1p23",
+      "max_coefficient_error": 3.2885873477161987e-07
+    },
+    {
+      "fixture": "deseq_hard_kidney_blocked_permutation_rep01_igkv1_27",
+      "max_coefficient_error": 6.091869675373118e-09
+    },
+    {
+      "fixture": "deseq_hard_kidney_blocked_permutation_rep01_adgrg7",
+      "max_coefficient_error": 2.823137594809566e-07
+    },
+    {
+      "fixture": "deseq_hard_kidney_blocked_permutation_rep01_linc02172",
+      "max_coefficient_error": 1.0045178022721757e-09
+    },
+    {
+      "fixture": "deseq_hard_kidney_blocked_permutation_rep01_fga",
+      "max_coefficient_error": 8.177831545275183e-08
+    },
+    {
+      "fixture": "deseq_hard_kidney_blocked_permutation_rep01_fgg",
+      "max_coefficient_error": 0.0002372846164200304
+    },
+    {
+      "fixture": "deseq_hard_kidney_full_blocked_permutation_rep01_mtnd1p23",
+      "max_coefficient_error": 3.2885873477161987e-07
+    },
+    {
+      "fixture": "deseq_hard_kidney_full_blocked_permutation_rep01_igkv1_27",
+      "max_coefficient_error": 6.091869675373118e-09
+    },
+    {
+      "fixture": "deseq_hard_kidney_full_blocked_permutation_rep01_adgrg7",
+      "max_coefficient_error": 2.823137594809566e-07
+    },
+    {
+      "fixture": "deseq_hard_kidney_full_blocked_permutation_rep01_linc02172",
+      "max_coefficient_error": 1.0045178022721757e-09
+    },
+    {
+      "fixture": "deseq_hard_kidney_full_blocked_permutation_rep01_fga",
+      "max_coefficient_error": 8.177831545275183e-08
+    },
+    {
+      "fixture": "deseq_hard_kidney_full_blocked_permutation_rep01_fgg",
+      "max_coefficient_error": 0.0002372846164200304
+    },
+    {
+      "fixture": "deseq_hard_liver_blocked_permutation_rep01_gstm1",
+      "max_coefficient_error": 0.0046567818501567215
+    },
+    {
+      "fixture": "deseq_hard_liver_blocked_permutation_rep01_mybph",
+      "max_coefficient_error": 1.9452962635169158e-06
+    },
+    {
+      "fixture": "deseq_hard_liver_blocked_permutation_rep01_il24",
+      "max_coefficient_error": 9.359220065618956e-10
+    },
+    {
+      "fixture": "deseq_hard_liver_blocked_permutation_rep01_aco2p2",
+      "max_coefficient_error": 1.0202866329578342e-09
+    },
+    {
+      "fixture": "deseq_hard_liver_blocked_permutation_rep01_eva1a_as",
+      "max_coefficient_error": 1.0507893444255956e-09
+    },
+    {
+      "fixture": "deseq_hard_liver_blocked_permutation_rep01_ecel1",
+      "max_coefficient_error": 2.6889959149151155e-05
+    },
+    {
+      "fixture": "deseq_hard_liver_full_blocked_permutation_rep01_mtnd1p23",
+      "max_coefficient_error": 1.4549594318236103e-06
+    },
+    {
+      "fixture": "deseq_hard_liver_full_blocked_permutation_rep01_gstm1",
+      "max_coefficient_error": 3.358349129151117e-06
+    },
+    {
+      "fixture": "deseq_hard_liver_full_blocked_permutation_rep01_lce3d",
+      "max_coefficient_error": 0.015284627879445623
+    },
+    {
+      "fixture": "deseq_hard_liver_full_blocked_permutation_rep01_aco2p2",
+      "max_coefficient_error": 9.306715398338383e-10
+    },
+    {
+      "fixture": "deseq_hard_liver_full_blocked_permutation_rep01_eva1a_as",
+      "max_coefficient_error": 1.7335937130269485e-09
+    },
+    {
+      "fixture": "deseq_hard_liver_full_blocked_permutation_rep01_ecel1",
+      "max_coefficient_error": 1.8802227441661046e-08
+    },
+    {
+      "fixture": "deseq_hard_pancreas_blocked_permutation_rep01_ensg00000213058",
+      "max_coefficient_error": 2.514978279799518e-07
+    },
+    {
+      "fixture": "deseq_hard_pancreas_blocked_permutation_rep01_ensg00000299070",
+      "max_coefficient_error": 2.764700107737994e-09
+    },
+    {
+      "fixture": "deseq_hard_pancreas_blocked_permutation_rep01_il36a",
+      "max_coefficient_error": 3.9070768842464076e-10
+    },
+    {
+      "fixture": "deseq_hard_pancreas_blocked_permutation_rep01_adgrg7",
+      "max_coefficient_error": 1.833193921108034e-07
+    },
+    {
+      "fixture": "deseq_hard_pancreas_blocked_permutation_rep01_adipoq",
+      "max_coefficient_error": 1.1907315666803697e-07
+    },
+    {
+      "fixture": "deseq_hard_pancreas_blocked_permutation_rep01_muc7",
+      "max_coefficient_error": 7.8962824477391e-06
+    },
+    {
+      "fixture": "deseq_hard_pancreas_full_blocked_permutation_rep01_gkn1",
+      "max_coefficient_error": 6.57025417313134e-06
+    },
+    {
+      "fixture": "deseq_hard_pancreas_full_blocked_permutation_rep01_il36a",
+      "max_coefficient_error": 7.89662241151845e-09
+    },
+    {
+      "fixture": "deseq_hard_pancreas_full_blocked_permutation_rep01_adgrg7",
+      "max_coefficient_error": 5.716849313941452e-07
+    },
+    {
+      "fixture": "deseq_hard_pancreas_full_blocked_permutation_rep01_tecrl",
+      "max_coefficient_error": 2.206597127241139e-10
+    },
+    {
+      "fixture": "deseq_hard_pancreas_full_blocked_permutation_rep01_muc7",
+      "max_coefficient_error": 6.783662709661069e-05
+    },
+    {
+      "fixture": "deseq_hard_pancreas_full_blocked_permutation_rep01_ensg00000303536",
+      "max_coefficient_error": 7.064961948799464e-09
+    },
+    {
+      "fixture": "~cell + dex:ENSG00000259278",
+      "max_coefficient_error": 5.476396935932826e-08
+    },
+    {
+      "fixture": "~cell + dex:ENSG00000161509",
+      "max_coefficient_error": 1.7252865802674933e-11
+    },
+    {
+      "fixture": "~cell + dex:ENSG00000211454",
+      "max_coefficient_error": 2.8885782654697323e-12
+    },
+    {
+      "fixture": "~cell + dex:ENSG00000018236",
+      "max_coefficient_error": 6.599443214128087e-12
+    },
+    {
+      "fixture": "~cell + dex:ENSG00000231409",
+      "max_coefficient_error": 5.721312312800819e-12
+    },
+    {
+      "fixture": "~cell + dex:ENSG00000171204",
+      "max_coefficient_error": 6.429634602511669e-12
+    },
+    {
+      "fixture": "~cell + dex:ENSG00000164062",
+      "max_coefficient_error": 1.3809120513741391e-11
+    },
+    {
+      "fixture": "~cell + dex:ENSG00000115414",
+      "max_coefficient_error": 3.910493262537784e-09
+    },
+    {
+      "fixture": "~cell + dex:ENSG00000179593",
+      "max_coefficient_error": 2.0870685627727426e-05
+    },
+    {
+      "fixture": "~cell + dex:ENSG00000109906",
+      "max_coefficient_error": 5.015898807414487e-10
+    },
+    {
+      "fixture": "~cell + dex:ENSG00000250978",
+      "max_coefficient_error": 2.7438273875191044e-11
+    },
+    {
+      "fixture": "~cell + dex:ENSG00000171819",
+      "max_coefficient_error": 1.4057954800250627e-10
+    },
+    {
+      "fixture": "~cell + dex:ENSG00000230522",
+      "max_coefficient_error": 1.3447657973397753e-05
+    },
+    {
+      "fixture": "~cell + dex:ENSG00000116721",
+      "max_coefficient_error": 0.8186639859637976
+    },
+    {
+      "fixture": "~dex:ENSG00000259278",
+      "max_coefficient_error": 1.1373203498976636e-06
+    },
+    {
+      "fixture": "~dex:ENSG00000161509",
+      "max_coefficient_error": 2.095254525436019e-12
+    },
+    {
+      "fixture": "~dex:ENSG00000211454",
+      "max_coefficient_error": 5.733281849273908e-09
+    },
+    {
+      "fixture": "~dex:ENSG00000018236",
+      "max_coefficient_error": 8.881784197001252e-14
+    },
+    {
+      "fixture": "~dex:ENSG00000231409",
+      "max_coefficient_error": 9.480386961580045e-12
+    },
+    {
+      "fixture": "~dex:ENSG00000171204",
+      "max_coefficient_error": 6.750155989720952e-13
+    },
+    {
+      "fixture": "~dex:ENSG00000164062",
+      "max_coefficient_error": 2.220446049250313e-12
+    },
+    {
+      "fixture": "~dex:ENSG00000115414",
+      "max_coefficient_error": 8.665185902145822e-09
+    },
+    {
+      "fixture": "~dex:ENSG00000179593",
+      "max_coefficient_error": 6.827005599063796e-06
+    },
+    {
+      "fixture": "~dex:ENSG00000109906",
+      "max_coefficient_error": 7.060929618774026e-11
+    },
+    {
+      "fixture": "~dex:ENSG00000250978",
+      "max_coefficient_error": 6.750155989720952e-12
+    },
+    {
+      "fixture": "~dex:ENSG00000171819",
+      "max_coefficient_error": 1.0988703280645495e-09
+    },
+    {
+      "fixture": "~dex:ENSG00000230522",
+      "max_coefficient_error": 2.0004230449899296e-07
+    },
+    {
+      "fixture": "~dex:ENSG00000116721",
+      "max_coefficient_error": 7.355623665716848e-09
+    }
+  ]
+}

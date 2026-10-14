@@ -1,6 +1,6 @@
 [package]
 name = "rcompat-lbfgsb"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 license = "MIT"
 description = "Rust implementation of R-style stats::optim L-BFGS-B behavior "
@@ -8,9 +8,17 @@ readme = "README.md"
 repository = "https://github.com/deminden/rcompat-lbfgsb"
 categories = ["algorithms", "science"]
 keywords = ["optimization", "lbfgsb", "r", "compatibility"]
-exclude = ["external/**", "data/**", "target/**", "Cargo.lock"]
+exclude = ["external/**", "data/**", "target/**", ".codex-local/**", "Cargo.lock"]
 
 [dependencies]
+
+[features]
+# R 4.6.1 macOS ARM / Clang contraction and Vortex short-dot arithmetic.
+arm-fma = []
+
+[[example]]
+name = "deseq2"
+required-features = ["arm-fma"]
 
 [dev-dependencies]
 serde = { version = "1.0.228", features = ["derive"] }

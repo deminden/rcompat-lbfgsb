@@ -45,6 +45,14 @@ a curvature-condition diagnostic. High-verbosity traces also include the
 accepted parameters and gradient so R trace output can be compared when
 investigating remaining path drift.
 
+The default floating-point profile preserves the pinned x86 oracle's short-dot
+reduction and separate scalar multiply/add rounding. The optional `arm-fma`
+feature uses sequential fused short dots and contracts scalar expressions in
+the compact model and line-search point construction, as measured externally
+for the macOS ARM oracle. This changes arithmetic, not optimizer controls or
+convergence criteria. The full DESeq2 callback stays in `examples/support/`;
+the generic backend contains no gene, dataset, or distribution-specific logic.
+
 The `factr` convergence check uses R's signed relative decrease
 `old_f - new_f`, not an absolute objective delta. This is equivalent on normal
 descent steps and preserves R behavior for rare accepted non-decreasing steps.
