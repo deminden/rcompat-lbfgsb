@@ -1,8 +1,10 @@
 #![allow(missing_docs)]
 #![cfg(all(target_arch = "aarch64", target_os = "macos"))]
 
-use rcompat_lbfgsb::{optim_lbfgsb, Bounds, OptimControl};
+mod support;
+use rcompat_lbfgsb::{Bounds, OptimControl};
 use serde_json::Value;
+use support::optim_x86 as optim_lbfgsb;
 
 #[test]
 fn full_nb_likelihood_with_deseq2_prior_replays_the_real_route() {
@@ -95,13 +97,16 @@ fn full_nb_likelihood_with_deseq2_prior_replays_the_real_route() {
                 control.clone(),
             )
             .unwrap();
-            let expected_beta = nums(&expected["beta"]);
-            let error = result
-                .par
-                .iter()
-                .zip(expected_beta)
-                .map(|(a, b)| (a - b).abs())
-                .fold(0.0, f64::max);
+            let expected_result = support::recorded_result(&expected["optimizer_result"]);
+            let comparison =
+                support::compare_scientific(&result, &expected_result, f64::MAX, f64::MAX);
+            assert!(
+                comparison.failures.is_empty(),
+                "{}: {}",
+                case["fixture"],
+                comparison.failures.join("; ")
+            );
+            let error = comparison.max_parameter_error;
             routed_errors.push(error);
             error_cases.push((error, case["fixture"].as_str().unwrap().to_owned()));
             let reduced = optim_lbfgsb(
@@ -111,14 +116,15 @@ fn full_nb_likelihood_with_deseq2_prior_replays_the_real_route() {
                 control.clone(),
             )
             .unwrap();
-            reduced_errors.push(
-                reduced
-                    .par
-                    .iter()
-                    .zip(nums(&expected["beta"]))
-                    .map(|(a, b)| (a - b).abs())
-                    .fold(0.0, f64::max),
+            let reduced_comparison =
+                support::compare_scientific(&reduced, &expected_result, f64::MAX, f64::MAX);
+            assert!(
+                reduced_comparison.failures.is_empty(),
+                "{} reduced objective: {}",
+                case["fixture"],
+                reduced_comparison.failures.join("; ")
             );
+            reduced_errors.push(reduced_comparison.max_parameter_error);
         }
     }
     assert_eq!(routed_errors.len(), 46);

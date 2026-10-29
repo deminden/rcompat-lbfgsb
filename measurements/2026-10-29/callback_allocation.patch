@@ -1,0 +1,113 @@
+--- a/src/backend/native/iteration.rs
++++ b/src/backend/native/iteration.rs
+@@ -24,6 +24,17 @@
+                 projected_gradient: initial_projected_norm,
+                 counts,
+             });
++        }
++        // A stationary initial point does not need correction columns or
++        // compact factors. Preserve its evaluation/events before returning.
++        if initial_projected_norm.is_finite() && initial_projected_norm <= control.pgtol {
++            return Ok(success(
++                x,
++                value,
++                counts,
++                TerminationReason::ProjectedGradient,
++                0,
++            ));
+         }
+         let has_finite_bound = lower.iter().chain(upper).any(|value| value.is_finite());
+         let finite_box = lower
+--- a/src/scaling.rs
++++ b/src/scaling.rs
+@@ -60,9 +60,17 @@
+         checked_finite(value * self.fnscale, "objective unscaling", None)
+     }
+ 
++    #[cfg(test)]
+     pub(crate) fn user_gradient_to_internal(
+         &self,
+         gradient: &[f64],
++    ) -> Result<Vec<f64>, OptimError> {
++        self.user_gradient_to_internal_owned(gradient.to_vec())
++    }
++
++    pub(crate) fn user_gradient_to_internal_owned(
++        &self,
++        mut gradient: Vec<f64>,
+     ) -> Result<Vec<f64>, OptimError> {
+         if gradient.len() != self.parscale.len() {
+             return Err(OptimError::InvalidGradient {
+@@ -75,26 +83,21 @@
+                 ),
+             });
+         }
+-        gradient
+-            .iter()
+-            .zip(self.parscale.iter())
+-            .enumerate()
+-            .map(|(index, (&value, &scale))| {
+-                if value.is_finite() {
+-                    checked_finite(
+-                        value * scale / self.fnscale,
+-                        "gradient scaling",
+-                        Some(index),
+-                    )
+-                } else {
+-                    Err(OptimError::InvalidGradient {
+-                        index: Some(index),
+-                        value: Some(value),
+-                        reason: "gradient entries must be finite".to_string(),
+-                    })
+-                }
+-            })
+-            .collect()
++        for (index, (value, &scale)) in gradient.iter_mut().zip(&self.parscale).enumerate() {
++            if !value.is_finite() {
++                return Err(OptimError::InvalidGradient {
++                    index: Some(index),
++                    value: Some(*value),
++                    reason: "gradient entries must be finite".to_owned(),
++                });
++            }
++            *value = checked_finite(
++                *value * scale / self.fnscale,
++                "gradient scaling",
++                Some(index),
++            )?;
++        }
++        Ok(gradient)
+     }
+ 
+     pub(crate) fn scale_bounds(&self, bounds: &Bounds) -> Result<Bounds, OptimError> {
+--- a/src/objective.rs
++++ b/src/objective.rs
+@@ -65,7 +65,7 @@
+             self.scaling
+                 .internal_to_user_par_into(x, &mut self.user_par)?;
+             let user_gradient = gradient(&self.user_par);
+-            return self.scaling.user_gradient_to_internal(&user_gradient);
++            return self.scaling.user_gradient_to_internal_owned(user_gradient);
+         }
+ 
+         let objective = &mut self.objective;
+--- a/benches/api_options.rs
++++ b/benches/api_options.rs
+@@ -161,7 +161,7 @@
+                 let value = self.scaling.user_value_to_internal(value)?;
+                 let gradient = self
+                     .scaling
+-                    .user_gradient_to_internal(&self.gradient_buffer)?;
++                    .user_gradient_to_internal_owned(self.gradient_buffer.clone())?;
+                 return Ok((value, gradient));
+             }
+         };
+@@ -170,7 +170,7 @@
+         }
+         Ok((
+             self.scaling.user_value_to_internal(value)?,
+-            self.scaling.user_gradient_to_internal(&gradient)?,
++            self.scaling.user_gradient_to_internal_owned(gradient)?,
+         ))
+     }
+ }

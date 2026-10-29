@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
+mod support;
 
-use rcompat_lbfgsb::{optim_lbfgsb_with_gradient, Bounds, OptimControl, OptimResult};
+use rcompat_lbfgsb::{Bounds, OptimControl, OptimResult};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -125,7 +126,20 @@ fn deseq_fixture_subset_is_consistent() {
 }
 
 #[test]
+#[cfg_attr(
+    not(all(target_arch = "x86_64", target_os = "linux")),
+    ignore = "full NB replay requires the recorded Linux x86 callback math; mandatory in pinned CI"
+)]
 fn deseq_real_gradient_optim_cases_match_r() {
+    replay_gradient_cases(true);
+}
+
+#[test]
+fn deseq_real_gradient_optim_cases_have_portable_scientific_accuracy() {
+    replay_gradient_cases(false);
+}
+
+fn replay_gradient_cases(full_result: bool) {
     let fixture = deseq_fixture();
     let tables = deseq_tables();
     let design = design_matrix(&tables.design);
@@ -134,6 +148,8 @@ fn deseq_real_gradient_optim_cases_match_r() {
     let scan_verbose = std::env::var_os("DESEQ_PARITY_SCAN_VERBOSE").is_some();
     let trace_gene = std::env::var("DESEQ_TRACE_GENE").ok();
 
+    let mut failures = Vec::new();
+    assert_eq!(fixture.cases.len(), 68);
     for case in &fixture.cases {
         let counts = counts_for_gene(&tables.counts, &case.gene);
         let should_trace = trace_gene.as_deref() == Some(case.gene.as_str());
@@ -215,10 +231,22 @@ fn deseq_real_gradient_optim_cases_match_r() {
                     case.gene, case.result.par
                 );
             }
+        }
+        let issues = if full_result {
+            result_failures(case, &result, 1e-8, 1e-8)
         } else {
-            assert_result_close(case, &result, 1e-8, 1e-8);
+            let comparison =
+                support::compare_scientific(&result, &expected_result(case), 1e-8, 1e-8);
+            if !comparison.bookkeeping_differences.is_empty() {
+                eprintln!("{}: {:?}", case.fixture, comparison.bookkeeping_differences);
+            }
+            comparison.failures
+        };
+        if !issues.is_empty() {
+            failures.push(format!("{}: {}", case.fixture, issues.join("; ")));
         }
     }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
 fn deseq_fixture() -> DeseqFixture {
@@ -596,42 +624,30 @@ fn control_from_case(control: &DeseqControl) -> OptimControl {
     }
 }
 
-fn assert_result_close(
+fn result_failures(
     case: &DeseqCase,
     result: &OptimResult,
     par_tolerance: f64,
     value_tolerance: f64,
-) {
-    assert_eq!(
-        result.convergence, case.result.convergence,
-        "{} convergence mismatch: result={result:?}",
-        case.fixture
-    );
-    assert_eq!(
-        result.message, case.result.message,
-        "{} message mismatch: result={result:?}",
-        case.fixture
-    );
-    assert_eq!(
-        result.counts.function, case.result.counts.function,
-        "{} function-count mismatch: result={result:?}",
-        case.fixture
-    );
-    assert_eq!(
-        result.counts.gradient, case.result.counts.gradient,
-        "{} gradient-count mismatch: result={result:?}",
-        case.fixture
-    );
-    for (actual, expected) in result.par.iter().zip(case.result.par.iter()) {
-        assert_close(*actual, *expected, par_tolerance, &case.fixture, "par");
+) -> Vec<String> {
+    support::compare(
+        result,
+        &expected_result(case),
+        support::x86_reference_contract(par_tolerance, value_tolerance),
+    )
+}
+
+fn expected_result(case: &DeseqCase) -> OptimResult {
+    OptimResult {
+        par: case.result.par.clone(),
+        value: case.result.value,
+        counts: rcompat_lbfgsb::OptimCounts {
+            function: case.result.counts.function,
+            gradient: case.result.counts.gradient,
+        },
+        convergence: case.result.convergence,
+        message: case.result.message.clone(),
     }
-    assert_close(
-        result.value,
-        case.result.value,
-        value_tolerance,
-        &case.fixture,
-        "value",
-    );
 }
 
 #[derive(Debug)]
@@ -648,21 +664,11 @@ fn scan_result(
     par_tolerance: f64,
     value_tolerance: f64,
 ) -> ScanResult {
-    let par_error = result
-        .par
-        .iter()
-        .zip(case.result.par.iter())
-        .map(|(actual, expected)| (actual - expected).abs())
-        .fold(0.0, f64::max);
+    let par_error = support::parameter_error(&result.par, &case.result.par);
     let value_error = (result.value - case.result.value).abs();
     let function_delta = result.counts.function.abs_diff(case.result.counts.function);
     let gradient_delta = result.counts.gradient.abs_diff(case.result.counts.gradient);
-    let passed = result.convergence == case.result.convergence
-        && result.message == case.result.message
-        && result.counts.function == case.result.counts.function
-        && result.counts.gradient == case.result.counts.gradient
-        && par_error <= par_tolerance
-        && value_error <= value_tolerance;
+    let passed = result_failures(case, result, par_tolerance, value_tolerance).is_empty();
 
     ScanResult {
         passed,
@@ -682,3 +688,5 @@ fn assert_close(actual: f64, expected: f64, tolerance: f64, fixture: &str, field
 fn parse_f64(value: &str) -> f64 {
     value.parse::<f64>().unwrap()
 }
+
+use support::optim_x86_with_gradient as optim_lbfgsb_with_gradient;

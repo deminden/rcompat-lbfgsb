@@ -12,10 +12,11 @@ env:
 
 jobs:
   rust:
+    name: Pinned Rust 1.99.0 reference tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.99.0
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
@@ -33,11 +34,39 @@ jobs:
         run: |
           package_files="$(mktemp)"
           cargo package --list --allow-dirty > "$package_files"
-          if grep -E '^(external|data|target|\.codex-local)/' "$package_files"; then
+          if grep -E '^(external|data|target)/' "$package_files"; then
             echo "Ignored inspection/data/build paths must not be packaged." >&2
             exit 1
           fi
           cargo package --allow-dirty
+
+  pinned_exact:
+    name: R 4.6.1 x86 exact contracts (${{ matrix.build }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        build: [debug, release]
+    env:
+      LBFGSB_EXACT_REFERENCE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Record runner arithmetic environment
+        run: |
+          test "$(uname -m)" = x86_64
+          rustc -vV
+          uname -a
+          getconf GNU_LIBC_VERSION
+      - name: Full result bits and bookkeeping
+        shell: bash
+        run: |
+          build_args=()
+          if [ '${{ matrix.build }}' = release ]; then
+            build_args+=(--release)
+          fi
+          cargo test "${build_args[@]}" --test deseq_real_subset --test deseq_hard_real_subset --test parity_fixtures -- --include-ignored
 
   arm_fma:
     name: macOS ARM precision
@@ -46,16 +75,96 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: ARM unit tests
-        run: cargo test --features arm-fma --lib
-      - name: DESeq2 precision gates
-        run: cargo test --features arm-fma --test deseq2_precision
-      - name: Release precision gates
-        run: cargo test --release --features arm-fma --test deseq2_precision
+      - name: Verify reference callback platform
+        run: test "$(uname -m)" = arm64
+      - name: ARM public API and precision gates
+        run: >-
+          cargo test --all-features --lib --test arithmetic_profiles --test observers
+          --test line_search_oracles --test mixed_bound_oracles --test generated_quadratics --test transformations
+          --test numerical_validity --test validation_contract --test api_smoke
+          --test bounds --test finite_diff --test quadratic --test scaling
+          --test deseq_real_subset --test deseq_hard_real_subset --test parity_fixtures
+          --test deseq2_precision --test native_reference_precision
+          --test stress_oracles
+      - name: Release public API and precision gates
+        run: >-
+          cargo test --release --all-features --lib --test arithmetic_profiles --test observers
+          --test line_search_oracles --test mixed_bound_oracles --test generated_quadratics --test transformations
+          --test numerical_validity --test validation_contract --test api_smoke
+          --test bounds --test finite_diff --test quadratic --test scaling
+          --test deseq_real_subset --test deseq_hard_real_subset --test parity_fixtures
+          --test deseq2_precision --test native_reference_precision
+          --test stress_oracles
+
+      - name: Native CPU scientific reference comparison
+        env:
+          RUSTFLAGS: -C target-cpu=native
+        run: cargo test --release --all-features --test native_reference_precision
+
+  portable:
+    name: Stable public API (${{ matrix.os }}, ${{ matrix.build }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-26]
+        build: [debug, release]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Both profiles and portable invariants
+        shell: bash
+        run: |
+          build_args=()
+          if [ '${{ matrix.build }}' = release ]; then
+            build_args+=(--release)
+          fi
+          for feature_args in --no-default-features --all-features; do
+            cargo test "${build_args[@]}" "$feature_args" --lib backend::native::compact::model_tests
+            cargo test "${build_args[@]}" "$feature_args" \
+              --test arithmetic_profiles --test observers --test numerical_validity \
+              --test line_search_oracles --test mixed_bound_oracles --test generated_quadratics --test transformations \
+              --test validation_contract --test api_smoke --test bounds --test stress_oracles \
+              --test finite_diff --test quadratic --test scaling --test parity_fixtures \
+              --test deseq_real_subset --test deseq_hard_real_subset
+          done
+      - name: Explicit profiles ignore feature unification
+        run: python3 scripts/check_profile_feature_invariance.py
+      - name: Oracle recipe provenance
+        run: python3 scripts/verify_oracles.py
+      - name: Corrupted oracle rejection
+        run: python3 scripts/test_verify_oracles.py
+      - name: Allocation and dimension growth
+        if: matrix.build == 'release'
+        shell: bash
+        run: |
+          measurements="$(mktemp)"
+          LBFGSB_BENCH_SAMPLES=3 cargo bench --bench allocation_growth > "$measurements"
+          python3 scripts/verify_measurements.py --after "$measurements"
+          python3 scripts/test_verify_measurements.py
+          python3 scripts/verify_api_measurements.py
+          LBFGSB_API_SAMPLES=3 python3 scripts/measure_api_comparison.py
+
+  msrv:
+    name: Minimum supported Rust 1.87
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.87.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Public library and all feature combinations
+        run: |
+          cargo check --lib --no-default-features
+          cargo check --all-targets --all-features
+          cargo test --all-features --lib --test arithmetic_profiles --test observers \
+            --test line_search_oracles --test mixed_bound_oracles --test generated_quadratics --test transformations \
+            --test numerical_validity --test validation_contract --test api_smoke \
+            --test bounds --test finite_diff --test quadratic --test scaling
 
   publish:
     name: Deploy to crates.io
-    needs: [rust, arm_fma]
+    needs: [rust, pinned_exact, arm_fma, portable, msrv]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     concurrency:

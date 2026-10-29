@@ -1,5 +1,97 @@
 # Changelog
 
+## 0.3.0 - Unreleased
+
+Implementation and local validation are complete as of 2026-10-29. The version
+is committed locally on `main`; no release tag or publication has been made.
+Debug, release and native CPU all-target suites pass. Final-revision remote CI
+remains required before publication.
+
+- Add source-built native R 4.6.2 / DESeq2 1.52.0 reference captures while
+  retaining R 4.6.1 regression data and the verified scientific precision gains.
+- Replace unavailable stress data, with user approval, by a self-contained
+  512-case corpus. All 512 complete-result contracts now pass.
+- Preserve left association in the cached YY-product update during simultaneous
+  free-set entry/exit. Add an exact 64-base/1,472-raw-call regression witness.
+- Add source-fingerprinted public console/BLAS trace capture without consulting
+  optimizer implementations, plus 96 independent constant-objective cases.
+- Solve retained unconstrained models directly in the full subspace to avoid
+  Cauchy cancellation roundoff, resolving 11 new reference mismatches.
+- Add shared scientific accuracy/result contracts, exact-mode CI assertions,
+  signed-zero-safe oracle serialization and real replay corruption tests.
+- Separate host-specific full callback replays from portable accuracy contracts;
+  retain strict native 512-case and x86 116-case gates. Add 256 independent NB
+  optimum checks and same-host before/after callback allocation measurement.
+- Fingerprint both installed R oracle runtimes and their bootstrap package archives.
+- Use Apple Silicon hardware descriptions consistently in documentation,
+  reference metadata and capture tools.
+- Verify 1,404 equivalent unit/maximization transformations and native CPU builds.
+- Calibrate ARM long-dot reduction against 200 independent public BLAS calls;
+  correct profile-specific Cauchy and cubic-interpolation contraction and trial
+  normalization. Extend independent dense model coverage to 594 states.
+- Add allocation/growth profiling over 224 configurations with before/after and
+  native CPU evidence. Reuse compact solve buffers and write history steps
+  directly into retained columns, reducing allocations in every measured case
+  while preserving complete-result fingerprints.
+- Scale supplied gradients in their returned owned buffer and skip unused history
+  construction when the initial projected gradient already meets tolerance.
+- Measure joint/fallible callback and reusable-buffer prototypes over 192
+  configurations, with full-result/error checks and native CPU comparisons.
+- Add independent binary64 serialization boundaries, atomic-failure checks and
+  mutation tests for BLAS fingerprints and allocation evidence.
+
+- Declare Rust 1.87 as the minimum and add an MSRV release gate.
+- Isolate old control/direction heuristics in test-only comparison code; split
+  production iteration, line search and compact state without changing precision.
+- Report typed line-search failure reasons and fix an overly permissive retry
+  warning that could accept a rounded zero-length step after a memory reset.
+- Add six exact R line-search traces, payload fingerprint/corruption checks,
+  dense-reference compact model identities and cyclic/active-set storage tests.
+
+- Add observed entry points with generic, synchronous scalar event callbacks;
+  preserve callback order and result bits when observation is enabled.
+- Add typed termination, model-recovery, history-update and acceptance outcomes,
+  including explicit Wolfe/cap/bracket-warning classification and derivatives.
+- Render public R-style termination messages centrally and emit final success
+  only after checked result conversion. Add observer failure/nesting regressions
+  and a standalone observer-cost benchmark.
+
+- Promote the compact state and More-Thuente search to all nonempty production
+  problems, including 1-D and mixed/infinite-bound numerical gradients. Confine
+  the independent dense Hessian solve to test builds.
+- Normalize first non-box trials by Euclidean direction length and permit
+  unbounded expansion to the measured 1e10 cap. Remove production gradient-noise
+  shortcuts and preserve R behavior for unrepresentable targets.
+- Correct factr=0 semantics: the zero reduction threshold still accepts rounded
+  zero reductions. Add 37 versioned black-box R 4.6.1 fixtures with generator
+  hashes and checked binary64 serialization, plus 576 closed-form quadratic cases.
+
+- Add explicit per-run `ArithmeticProfile` selection for both callback forms;
+  preserve the original API's feature-dependent legacy default. Both arithmetic
+  implementations are available regardless of feature settings.
+- Isolate rounding policies in a profile module and pass profile values through
+  the compact model, line search and fallback directions without global state.
+- Add nested/concurrent profile tests, independent binary64 rounding checks and
+  an executable comparison across separate feature builds.
+- Pin fixture arithmetic explicitly, expand debug/release portable CI across
+  Linux/macOS and feature configurations, and pin the reference Rust toolchain.
+
+- Reject overflow after scaling and unscaling, invalid numerical stencils, and
+  non-finite bounds membership checks. Add operation-specific numerical errors.
+- Prevent small initial slopes and blocked directions from reporting false
+  projected-gradient convergence; preserve post-progress reference roundoff rules.
+- Reuse finite-difference candidate and user-coordinate storage, borrow gradient
+  configuration, and remove temporary column vectors from compact factorization.
+- Add a dependency-free CSV optimizer/callback benchmark over bound routes,
+  dimensions, history sizes, callback costs and trace settings.
+- Use the complete-result comparator for supplied-gradient scientific fixtures.
+- Emit direction traces from the actual model without reconstructing a dense solve.
+- Add public numerical regressions and mutation tests for a complete-result
+  fixture comparator. Strict synthetic scans now check counts, status, message
+  and executed case count in addition to endpoint error.
+- External-data scans are explicitly ignored by default; append `-- --ignored`
+  to the selected test command to execute them with the oracle bundle present.
+
 ## 0.2.2 - 2026-10-14
 
 ### macOS ARM arithmetic and real DESeq2 precision

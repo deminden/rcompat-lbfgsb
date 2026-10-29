@@ -24,3 +24,10 @@ bounds. Detailed generation and audit provenance is recorded in the repository
 `PROVENANCE.md`.
 
 Real-data DESeq-derived fixture subsets live in `fixtures/deseq_real_subset/`.
+
+In 0.3.0, polynomial result and trace checks run on every supported host. The
+sinusoidal fixture's full count/message replay requires the recorded Linux x86
+callback math and is explicitly ignored elsewhere. Its portable scientific
+check still uses the same endpoint/value tolerances and convergence status;
+count/message differences are reported as observations. The pinned x86 CI job
+requires the full replay.

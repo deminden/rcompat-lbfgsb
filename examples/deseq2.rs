@@ -3,7 +3,7 @@
 mod objective;
 
 use objective::Deseq2Objective;
-use rcompat_lbfgsb::{optim_lbfgsb, Bounds, OptimControl};
+use rcompat_lbfgsb::{optim_lbfgsb_with_profile, ArithmeticProfile, Bounds, OptimControl};
 use serde_json::Value;
 
 fn nums(v: &Value) -> Vec<f64> {
@@ -47,11 +47,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &nums(&case["counts"]),
                 case["dispersion"].as_f64().unwrap(),
             );
-            let result = optim_lbfgsb(
+            let result = optim_lbfgsb_with_profile(
                 start,
                 Bounds::new(nums(&case["lower"]), nums(&case["upper"]))?,
                 |beta| objective.value(beta),
                 OptimControl::default_for_dimension(dimension),
+                ArithmeticProfile::R461MacArm,
             )?;
             let error = result
                 .par

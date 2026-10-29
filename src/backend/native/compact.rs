@@ -1,5 +1,6 @@
 use super::*;
 
+#[cfg(test)]
 pub(super) fn compact_subspace_minimizer_r23(
     x: &[f64],
     gradient: &[f64],
@@ -120,6 +121,7 @@ pub(super) fn compact_subspace_minimizer_r23(
 }
 
 #[derive(Debug)]
+#[cfg(test)]
 struct CompactMatrices {
     theta: f64,
     sy: Vec<Vec<f64>>,
@@ -127,6 +129,7 @@ struct CompactMatrices {
     history: Vec<Correction>,
 }
 
+#[cfg(test)]
 impl CompactMatrices {
     fn new(history: &[Correction]) -> Option<Self> {
         let last = history.last()?;
@@ -223,6 +226,7 @@ impl CompactMatrices {
     }
 }
 
+#[cfg(test)]
 fn form_compact_wt(theta: f64, sy: &[Vec<f64>], ss: &[Vec<f64>]) -> Option<Vec<Vec<f64>>> {
     let col = sy.len();
     let mut wt = vec![vec![0.0; col]; col];
@@ -241,6 +245,7 @@ fn form_compact_wt(theta: f64, sy: &[Vec<f64>], ss: &[Vec<f64>]) -> Option<Vec<V
     Some(wt)
 }
 
+#[cfg(test)]
 fn compact_middle_product(sy: &[Vec<f64>], wt: &[Vec<f64>], vector: &[f64]) -> Option<Vec<f64>> {
     let col = sy.len();
     if vector.len() != 2 * col {
@@ -271,6 +276,7 @@ fn compact_middle_product(sy: &[Vec<f64>], wt: &[Vec<f64>], vector: &[f64]) -> O
     Some(product)
 }
 
+#[cfg(test)]
 fn cholesky_upper_in_place(matrix: &mut [Vec<f64>], offset: usize, dimension: usize) -> Option<()> {
     for column in 0..dimension {
         for row in 0..=column {
@@ -292,6 +298,7 @@ fn cholesky_upper_in_place(matrix: &mut [Vec<f64>], offset: usize, dimension: us
     Some(())
 }
 
+#[cfg(test)]
 fn solve_upper_transpose_in_place(
     upper: &[Vec<f64>],
     offset: usize,
@@ -315,6 +322,7 @@ fn solve_upper_transpose_in_place(
     Some(())
 }
 
+#[cfg(test)]
 fn solve_upper_in_place(
     upper: &[Vec<f64>],
     offset: usize,
@@ -338,6 +346,7 @@ fn solve_upper_in_place(
     Some(())
 }
 
+#[cfg(test)]
 fn index_mask(dimension: usize, indices: &[usize]) -> Vec<bool> {
     let mut mask = vec![false; dimension];
     for &index in indices {
@@ -346,6 +355,7 @@ fn index_mask(dimension: usize, indices: &[usize]) -> Vec<bool> {
     mask
 }
 
+#[cfg(test)]
 fn dot_on_indices(left: &[f64], right: &[f64], indices: &[usize]) -> f64 {
     indices
         .iter()
@@ -353,13 +363,14 @@ fn dot_on_indices(left: &[f64], right: &[f64], indices: &[usize]) -> f64 {
         .sum()
 }
 
-/// Exact stateful compact L-BFGS-B model for objective-only finite boxes.
+/// Stateful compact L-BFGS-B model for all production bound and gradient routes.
 ///
 /// Unlike `CompactMatrices`, this retains the cyclic S/Y columns and the cached
 /// SY/SS/WT/WN/WN1 workspaces across outer iterations.  Its operation order is
 /// the one documented by the permissive language-neutral subroutine specs.
 #[derive(Debug)]
 pub(super) struct ExactCompactState {
+    profile: ArithmeticProfile,
     n: usize,
     memory: usize,
     ws: Vec<Vec<f64>>,
@@ -397,7 +408,13 @@ struct FreePartition {
 }
 
 impl ExactCompactState {
-    pub(super) fn new(dimension: usize, memory: usize, lower: &[f64], upper: &[f64]) -> Self {
+    pub(super) fn new(
+        profile: ArithmeticProfile,
+        dimension: usize,
+        memory: usize,
+        lower: &[f64],
+        upper: &[f64],
+    ) -> Self {
         let memory = memory.max(1);
         let mut iwhere = vec![0; dimension];
         for index in 0..dimension {
@@ -408,6 +425,7 @@ impl ExactCompactState {
             };
         }
         Self {
+            profile,
             n: dimension,
             memory,
             ws: vec![vec![0.0; dimension]; memory],
@@ -451,6 +469,14 @@ impl ExactCompactState {
         }
     }
 
+    pub(super) fn snapshot(&self) -> crate::ModelSnapshot {
+        crate::ModelSnapshot {
+            active: self.n - self.nfree_previous,
+            free: self.nfree_previous,
+            history: self.col,
+        }
+    }
+
     pub(super) fn has_history(&self) -> bool {
         self.col > 0
     }
@@ -462,29 +488,41 @@ impl ExactCompactState {
         lower: &[f64],
         upper: &[f64],
         projected_gradient_norm: f64,
-        min_step: f64,
-    ) -> Option<DirectionChoice> {
+        _min_step: f64,
+    ) -> Result<DirectionChoice, RecoveryReason> {
         debug_assert_eq!(x.len(), self.n);
-        let cauchy = self.cauchy(x, gradient, lower, upper, projected_gradient_norm)?;
+        // With no constraints and a retained model, solve directly in the
+        // full subspace. Computing and cancelling an unnecessary Cauchy step
+        // changes rounding and can amplify drift on ill-conditioned models.
+        let cauchy = if self.col > 0 && lower.iter().chain(upper).all(|bound| bound.is_infinite()) {
+            ExactCauchyPoint {
+                x: x.to_vec(),
+                c: vec![0.0; 2 * self.col],
+            }
+        } else {
+            self.cauchy(x, gradient, lower, upper, projected_gradient_norm)
+                .ok_or(RecoveryReason::CauchyModel)?
+        };
         let partition = self.partition_free_variables();
-        let reduced = self.reduced_gradient(x, gradient, &cauchy.x, &cauchy.c, partition.nfree)?;
+        let reduced = self
+            .reduced_gradient(x, gradient, &cauchy.x, &cauchy.c, partition.nfree)
+            .ok_or(RecoveryReason::ReducedGradient)?;
 
         let mut target = cauchy.x;
         if partition.nfree > 0 && self.col > 0 {
             if partition.work && !self.formk(partition) {
                 self.clear_history();
-                return None;
+                return Err(RecoveryReason::SubspaceFactorization);
             }
-            target = self.subspace_minimizer(lower, upper, target, reduced, partition.nfree)?;
+            target = self
+                .subspace_minimizer(lower, upper, target, reduced, partition.nfree)
+                .ok_or(RecoveryReason::SubspaceSolve)?;
         }
 
         self.nfree_previous = partition.nfree;
         self.iteration += 1;
         let direction = difference(&target, x);
-        if norm_inf(&direction) <= min_step {
-            return None;
-        }
-        Some(DirectionChoice {
+        Ok(DirectionChoice {
             direction,
             unit_step_target: Some(target),
             refresh_history: false,
@@ -501,9 +539,11 @@ impl ExactCompactState {
         gradient_difference: &[f64],
         initial_derivative: f64,
         final_derivative: f64,
-    ) -> bool {
+    ) -> HistoryUpdate {
         debug_assert_eq!(direction.len(), self.n);
-        let rr = openblas_cooperlake_short_dot(gradient_difference, gradient_difference);
+        let rr = self
+            .profile
+            .short_dot(gradient_difference, gradient_difference);
         let derivative_delta = final_derivative - initial_derivative;
         let dr = if alpha == 1.0 {
             derivative_delta
@@ -517,17 +557,10 @@ impl ExactCompactState {
         };
         if dr <= f64::EPSILON * ddum {
             self.updatd = false;
-            return true;
+            return HistoryUpdate::SkippedCurvature;
         }
 
-        let dtd = openblas_cooperlake_short_dot(direction, direction);
-        let mut stored_step = direction.to_vec();
-        if alpha != 1.0 {
-            for value in &mut stored_step {
-                *value *= alpha;
-            }
-        }
-
+        let dtd = self.profile.short_dot(direction, direction);
         self.iupdat += 1;
         if self.iupdat <= self.memory {
             self.col = self.iupdat;
@@ -537,7 +570,12 @@ impl ExactCompactState {
             self.head = (self.head + 1) % self.memory;
         }
 
-        self.ws[self.itail].copy_from_slice(&stored_step);
+        self.ws[self.itail].copy_from_slice(direction);
+        if alpha != 1.0 {
+            for value in &mut self.ws[self.itail] {
+                *value *= alpha;
+            }
+        }
         self.wy[self.itail].copy_from_slice(gradient_difference);
         self.theta = rr / dr;
 
@@ -554,10 +592,12 @@ impl ExactCompactState {
 
         let mut pointer = self.head;
         for previous in 0..self.col - 1 {
-            self.sy[self.col - 1][previous] =
-                openblas_cooperlake_short_dot(&stored_step, &self.wy[pointer]);
-            self.ss[previous][self.col - 1] =
-                openblas_cooperlake_short_dot(&self.ws[pointer], &stored_step);
+            self.sy[self.col - 1][previous] = self
+                .profile
+                .short_dot(&self.ws[self.itail], &self.wy[pointer]);
+            self.ss[previous][self.col - 1] = self
+                .profile
+                .short_dot(&self.ws[pointer], &self.ws[self.itail]);
             pointer = (pointer + 1) % self.memory;
         }
         self.ss[self.col - 1][self.col - 1] = if alpha == 1.0 {
@@ -569,10 +609,10 @@ impl ExactCompactState {
 
         if !self.formt() {
             self.clear_history();
-            return false;
+            return HistoryUpdate::ResetFactorization;
         }
         self.updatd = true;
-        true
+        HistoryUpdate::Stored
     }
 
     fn formt(&mut self) -> bool {
@@ -588,10 +628,10 @@ impl ExactCompactState {
                 for index in 0..row {
                     sum += self.sy[row][index] * self.sy[column][index] / self.sy[index][index];
                 }
-                self.wt[row][column] = reference_mul_add(self.theta, self.ss[row][column], sum);
+                self.wt[row][column] = self.profile.mul_add(self.theta, self.ss[row][column], sum);
             }
         }
-        coherent_cholesky_upper_in_place(&mut self.wt, 0, self.col).is_some()
+        coherent_cholesky_upper_in_place(self.profile, &mut self.wt, 0, self.col).is_some()
     }
 
     fn bmv(&self, vector: &[f64]) -> Option<Vec<f64>> {
@@ -611,7 +651,13 @@ impl ExactCompactState {
             }
             product[col + row] = vector[col + row] + sum;
         }
-        coherent_solve_upper_transpose_in_place(&self.wt, 0, col, &mut product[col..])?;
+        coherent_solve_upper_transpose_in_place(
+            self.profile,
+            &self.wt,
+            0,
+            col,
+            &mut product[col..],
+        )?;
         for (index, (target, &value)) in product[..col]
             .iter_mut()
             .zip(vector[..col].iter())
@@ -696,13 +742,17 @@ impl ExactCompactState {
             }
 
             direction[index] = neggi;
-            f1 = reference_mul_add(-neggi, neggi, f1);
+            f1 = self.profile.mul_add(-neggi, neggi, f1);
             let mut pointer = self.head;
             for history_index in 0..self.col {
                 p[history_index] =
-                    reference_mul_add(self.wy[pointer][index], neggi, p[history_index]);
-                p[self.col + history_index] =
-                    reference_mul_add(self.ws[pointer][index], neggi, p[self.col + history_index]);
+                    self.profile
+                        .mul_add(self.wy[pointer][index], neggi, p[history_index]);
+                p[self.col + history_index] = self.profile.mul_add(
+                    self.ws[pointer][index],
+                    neggi,
+                    p[self.col + history_index],
+                );
                 pointer = (pointer + 1) % self.memory;
             }
 
@@ -748,7 +798,7 @@ impl ExactCompactState {
         let f2_original = f2;
         if self.col > 0 {
             let inverse_p = self.bmv(&p)?;
-            f2 -= openblas_cooperlake_short_dot(&inverse_p, &p);
+            f2 -= self.profile.short_dot(&inverse_p, &p);
         }
         let mut dtm = if f2 != 0.0 { -f1 / f2 } else { 0.0 };
         let mut total = 0.0;
@@ -800,16 +850,16 @@ impl ExactCompactState {
                 }
 
                 let bound_direction_squared = bound_direction * bound_direction;
-                if self.col == 0 {
-                    let correction = interval * f2 + bound_direction_squared
-                        - bound_direction * bound_displacement;
-                    f1 += correction;
-                } else {
-                    let correction = interval * f2 + bound_direction_squared
-                        - self.theta * bound_direction * bound_displacement;
-                    f1 += correction;
-                }
-                f2 -= self.theta * bound_direction_squared;
+                let partial = self.profile.mul_add(interval, f2, bound_direction_squared);
+                let correction = self.profile.mul_add(
+                    -self.theta * bound_direction,
+                    bound_displacement,
+                    partial,
+                );
+                f1 += correction;
+                f2 = self
+                    .profile
+                    .mul_add(-self.theta, bound_direction_squared, f2);
 
                 if self.col > 0 {
                     coherent_daxpy(&mut c, &p, interval);
@@ -821,12 +871,16 @@ impl ExactCompactState {
                         pointer = (pointer + 1) % self.memory;
                     }
                     let inverse_wbp = self.bmv(&wbp)?;
-                    let wmc = openblas_cooperlake_short_dot(&c, &inverse_wbp);
-                    let wmp = openblas_cooperlake_short_dot(&p, &inverse_wbp);
-                    let wmw = openblas_cooperlake_short_dot(&wbp, &inverse_wbp);
+                    let wmc = self.profile.short_dot(&c, &inverse_wbp);
+                    let wmp = self.profile.short_dot(&p, &inverse_wbp);
+                    let wmw = self.profile.short_dot(&wbp, &inverse_wbp);
                     coherent_daxpy(&mut p, &wbp, -bound_direction);
-                    f1 += bound_direction * wmc;
-                    f2 += -(bound_direction_squared * wmw) + (2.0 * bound_direction) * wmp;
+                    f1 = self.profile.mul_add(bound_direction, wmc, f1);
+                    f2 += self.profile.mul_add(
+                        2.0 * bound_direction,
+                        wmp,
+                        -(bound_direction_squared * wmw),
+                    );
                 }
 
                 f2 = f2.max(f64::EPSILON * f2_original);
@@ -905,7 +959,9 @@ impl ExactCompactState {
         let mut reduced = vec![0.0; nfree];
         for (slot, value) in reduced.iter_mut().enumerate() {
             let index = self.index[slot];
-            *value = reference_mul_add(-self.theta, cauchy[index] - x[index], -gradient[index]);
+            *value = self
+                .profile
+                .mul_add(-self.theta, cauchy[index] - x[index], -gradient[index]);
         }
         if self.col == 0 {
             return Some(reduced);
@@ -919,7 +975,8 @@ impl ExactCompactState {
             for (slot, value) in reduced.iter_mut().enumerate() {
                 let index = self.index[slot];
                 *value +=
-                    reference_mul_add(self.wy[pointer][index], a1, self.ws[pointer][index] * a2);
+                    self.profile
+                        .mul_add(self.wy[pointer][index], a1, self.ws[pointer][index] * a2);
             }
             pointer = (pointer + 1) % self.memory;
         }
@@ -953,7 +1010,7 @@ impl ExactCompactState {
                 let mut sy_active = 0.0;
                 for slot in 0..partition.nfree {
                     let index = self.index[slot];
-                    yy_free = reference_mul_add(
+                    yy_free = self.profile.mul_add(
                         self.wy[newest_storage][index],
                         self.wy[previous_storage][index],
                         yy_free,
@@ -961,12 +1018,12 @@ impl ExactCompactState {
                 }
                 for slot in partition.nfree..self.n {
                     let index = self.index[slot];
-                    ss_active = reference_mul_add(
+                    ss_active = self.profile.mul_add(
                         self.ws[newest_storage][index],
                         self.ws[previous_storage][index],
                         ss_active,
                     );
-                    sy_active = reference_mul_add(
+                    sy_active = self.profile.mul_add(
                         self.ws[newest_storage][index],
                         self.wy[previous_storage][index],
                         sy_active,
@@ -983,7 +1040,7 @@ impl ExactCompactState {
                 let mut sy_free = 0.0;
                 for slot in 0..partition.nfree {
                     let index = self.index[slot];
-                    sy_free = reference_mul_add(
+                    sy_free = self.profile.mul_add(
                         self.ws[row_storage][index],
                         self.wy[newest_storage][index],
                         sy_free,
@@ -1005,12 +1062,12 @@ impl ExactCompactState {
                 let mut ss_leave = 0.0;
                 for slot in 0..partition.nenter {
                     let index = self.indx2[slot];
-                    yy_enter = reference_mul_add(
+                    yy_enter = self.profile.mul_add(
                         self.wy[row_storage][index],
                         self.wy[column_storage][index],
                         yy_enter,
                     );
-                    ss_enter = reference_mul_add(
+                    ss_enter = self.profile.mul_add(
                         self.ws[row_storage][index],
                         self.ws[column_storage][index],
                         ss_enter,
@@ -1018,18 +1075,21 @@ impl ExactCompactState {
                 }
                 for slot in partition.ileave..self.n {
                     let index = self.indx2[slot];
-                    yy_leave = reference_mul_add(
+                    yy_leave = self.profile.mul_add(
                         self.wy[row_storage][index],
                         self.wy[column_storage][index],
                         yy_leave,
                     );
-                    ss_leave = reference_mul_add(
+                    ss_leave = self.profile.mul_add(
                         self.ws[row_storage][index],
                         self.ws[column_storage][index],
                         ss_leave,
                     );
                 }
-                self.wn1[row_logical][column_logical] += yy_enter - yy_leave;
+                // Add entrants to the cached YY product before subtracting
+                // departures. Pre-combining both sums changes reference rounding.
+                self.wn1[row_logical][column_logical] =
+                    (self.wn1[row_logical][column_logical] + yy_enter) - yy_leave;
                 self.wn1[m + row_logical][m + column_logical] += -ss_enter + ss_leave;
                 column_storage = (column_storage + 1) % m;
             }
@@ -1044,7 +1104,7 @@ impl ExactCompactState {
                 let mut sy_leave = 0.0;
                 for slot in 0..partition.nenter {
                     let index = self.indx2[slot];
-                    sy_enter = reference_mul_add(
+                    sy_enter = self.profile.mul_add(
                         self.ws[row_storage][index],
                         self.wy[column_storage][index],
                         sy_enter,
@@ -1052,7 +1112,7 @@ impl ExactCompactState {
                 }
                 for slot in partition.ileave..self.n {
                     let index = self.indx2[slot];
-                    sy_leave = reference_mul_add(
+                    sy_leave = self.profile.mul_add(
                         self.ws[row_storage][index],
                         self.wy[column_storage][index],
                         sy_leave,
@@ -1083,26 +1143,32 @@ impl ExactCompactState {
             self.wn[row][row] += self.sy[row][row];
         }
 
-        if coherent_cholesky_upper_in_place(&mut self.wn, 0, col).is_none() {
+        if coherent_cholesky_upper_in_place(self.profile, &mut self.wn, 0, col).is_none() {
             return false;
         }
+        let mut rhs = vec![0.0; col];
         for column in col..2 * col {
-            let mut rhs: Vec<f64> = (0..col).map(|row| self.wn[row][column]).collect();
-            if coherent_solve_upper_transpose_in_place(&self.wn, 0, col, &mut rhs).is_none() {
+            for (row, value) in rhs.iter_mut().enumerate() {
+                *value = self.wn[row][column];
+            }
+            if coherent_solve_upper_transpose_in_place(self.profile, &self.wn, 0, col, &mut rhs)
+                .is_none()
+            {
                 return false;
             }
-            for (row, value) in rhs.into_iter().enumerate() {
+            for (row, &value) in rhs.iter().enumerate() {
                 self.wn[row][column] = value;
             }
         }
         for row in col..2 * col {
             for column in row..2 * col {
-                let left: Vec<f64> = (0..col).map(|index| self.wn[index][row]).collect();
-                let right: Vec<f64> = (0..col).map(|index| self.wn[index][column]).collect();
-                self.wn[row][column] += openblas_cooperlake_short_dot(&left, &right);
+                let update = self
+                    .profile
+                    .indexed_dot(col, |index| (self.wn[index][row], self.wn[index][column]));
+                self.wn[row][column] += update;
             }
         }
-        coherent_cholesky_upper_in_place(&mut self.wn, col, col).is_some()
+        coherent_cholesky_upper_in_place(self.profile, &mut self.wn, col, col).is_some()
     }
 
     fn subspace_minimizer(
@@ -1121,14 +1187,18 @@ impl ExactCompactState {
             let mut s_dot = 0.0;
             for (slot, &direction_value) in direction.iter().take(nfree).enumerate() {
                 let index = self.index[slot];
-                y_dot = reference_mul_add(self.wy[pointer][index], direction_value, y_dot);
-                s_dot = reference_mul_add(self.ws[pointer][index], direction_value, s_dot);
+                y_dot = self
+                    .profile
+                    .mul_add(self.wy[pointer][index], direction_value, y_dot);
+                s_dot = self
+                    .profile
+                    .mul_add(self.ws[pointer][index], direction_value, s_dot);
             }
             wv[history_index] = y_dot;
             wv[col + history_index] = self.theta * s_dot;
             pointer = (pointer + 1) % self.memory;
         }
-        coherent_solve_upper_transpose_in_place(&self.wn, 0, 2 * col, &mut wv)?;
+        coherent_solve_upper_transpose_in_place(self.profile, &self.wn, 0, 2 * col, &mut wv)?;
         for value in wv.iter_mut().take(col) {
             *value = -*value;
         }
@@ -1138,7 +1208,7 @@ impl ExactCompactState {
         for history_index in 0..col {
             for (slot, value) in direction.iter_mut().take(nfree).enumerate() {
                 let index = self.index[slot];
-                *value += reference_mul_add(
+                *value += self.profile.mul_add(
                     self.ws[pointer][index],
                     wv[col + history_index],
                     self.wy[pointer][index] * wv[history_index] / self.theta,
@@ -1170,7 +1240,7 @@ impl ExactCompactState {
         }
         for (slot, &step) in direction.iter().take(nfree).enumerate() {
             let index = self.index[slot];
-            point[index] = reference_mul_add(alpha, step, point[index]);
+            point[index] = self.profile.mul_add(alpha, step, point[index]);
         }
         Some(point)
     }
@@ -1216,6 +1286,7 @@ fn exact_shared_feasible_step(
 }
 
 fn coherent_cholesky_upper_in_place(
+    profile: ArithmeticProfile,
     matrix: &mut [Vec<f64>],
     offset: usize,
     dimension: usize,
@@ -1223,17 +1294,16 @@ fn coherent_cholesky_upper_in_place(
     for column in 0..dimension {
         let mut squared_norm = 0.0;
         for row in 0..column {
-            let left = (0..row)
-                .map(|index| matrix[offset + index][offset + row])
-                .collect::<Vec<_>>();
-            let right = (0..row)
-                .map(|index| matrix[offset + index][offset + column])
-                .collect::<Vec<_>>();
-            let mut value = matrix[offset + row][offset + column]
-                - openblas_cooperlake_short_dot(&left, &right);
+            let update = profile.indexed_dot(row, |index| {
+                (
+                    matrix[offset + index][offset + row],
+                    matrix[offset + index][offset + column],
+                )
+            });
+            let mut value = matrix[offset + row][offset + column] - update;
             value /= matrix[offset + row][offset + row];
             matrix[offset + row][offset + column] = value;
-            squared_norm = reference_mul_add(value, value, squared_norm);
+            squared_norm = profile.mul_add(value, value, squared_norm);
         }
         let pivot = matrix[offset + column][offset + column] - squared_norm;
         if pivot <= 0.0 || !pivot.is_finite() {
@@ -1245,6 +1315,7 @@ fn coherent_cholesky_upper_in_place(
 }
 
 fn coherent_solve_upper_transpose_in_place(
+    profile: ArithmeticProfile,
     upper: &[Vec<f64>],
     offset: usize,
     dimension: usize,
@@ -1254,10 +1325,10 @@ fn coherent_solve_upper_transpose_in_place(
         return None;
     }
     for row in 0..dimension {
-        let left = (0..row)
-            .map(|column| upper[offset + column][offset + row])
-            .collect::<Vec<_>>();
-        let value = rhs[row] - openblas_cooperlake_short_dot(&left, &rhs[..row]);
+        let update = profile.indexed_dot(row, |column| {
+            (upper[offset + column][offset + row], rhs[column])
+        });
+        let value = rhs[row] - update;
         let diagonal = upper[offset + row][offset + row];
         if diagonal == 0.0 || !diagonal.is_finite() {
             return None;
@@ -1364,9 +1435,12 @@ mod exact_tests {
     fn exact_state_scales_nonunit_steps_before_cyclic_storage() {
         let lower = vec![-1.0, -1.0];
         let upper = vec![1.0, 1.0];
-        let mut state = ExactCompactState::new(2, 2, &lower, &upper);
+        let mut state = ExactCompactState::new(ArithmeticProfile::legacy(), 2, 2, &lower, &upper);
 
-        assert!(state.update(&[1.0, 2.0], 0.5, &[0.25, 0.5], -10.0, -8.0));
+        assert_eq!(
+            state.update(&[1.0, 2.0], 0.5, &[0.25, 0.5], -10.0, -8.0),
+            HistoryUpdate::Stored
+        );
         assert_eq!(state.col, 1);
         assert_eq!(state.head, 0);
         assert_eq!(state.itail, 0);
@@ -1392,3 +1466,62 @@ mod exact_tests {
         assert_eq!(point[1] + alpha * direction[1], 0.625);
     }
 }
+
+#[cfg(test)]
+mod factorization_tests {
+    use super::*;
+
+    #[test]
+    fn compact_factor_and_solve_recover_independently_constructed_solutions() {
+        // Construct A = U^T U from a known upper factor; the production code
+        // must recover a solve without sharing its factorization arithmetic.
+        for n in [1, 2, 3, 4, 5, 8, 11, 16] {
+            let upper: Vec<Vec<f64>> = (0..n)
+                .map(|i| {
+                    (0..n)
+                        .map(|j| {
+                            if j < i {
+                                0.0
+                            } else if j == i {
+                                2.0 + i as f64 / 8.0
+                            } else {
+                                (i + j + 1) as f64 / 32.0
+                            }
+                        })
+                        .collect()
+                })
+                .collect();
+            let mut matrix = vec![vec![0.0; n]; n];
+            for i in 0..n {
+                for j in 0..n {
+                    matrix[i][j] = (0..n).map(|k| upper[k][i] * upper[k][j]).sum();
+                }
+            }
+            let expected: Vec<f64> = (0..n).map(|i| (i as f64 - 3.0) / 7.0).collect();
+            let mut rhs: Vec<f64> = matrix
+                .iter()
+                .map(|row| row.iter().zip(&expected).map(|(a, b)| a * b).sum())
+                .collect();
+            coherent_cholesky_upper_in_place(ArithmeticProfile::legacy(), &mut matrix, 0, n)
+                .unwrap();
+            coherent_solve_upper_transpose_in_place(
+                ArithmeticProfile::legacy(),
+                &matrix,
+                0,
+                n,
+                &mut rhs,
+            )
+            .unwrap();
+            coherent_solve_upper_in_place(&matrix, 0, n, &mut rhs).unwrap();
+            for (actual, expected) in rhs.iter().zip(&expected) {
+                assert!(
+                    (actual - expected).abs() < 1e-12,
+                    "n={n}: {actual} != {expected}"
+                );
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod model_tests;

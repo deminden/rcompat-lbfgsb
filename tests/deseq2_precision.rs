@@ -1,11 +1,12 @@
-#![cfg(feature = "arm-fma")]
 #![allow(missing_docs)]
+#![cfg(all(target_arch = "aarch64", target_os = "macos"))]
 
 #[path = "../examples/support/deseq2_objective.rs"]
 mod objective;
 
+mod support;
 use objective::Deseq2Objective;
-use rcompat_lbfgsb::{optim_lbfgsb, Bounds, OptimControl};
+use rcompat_lbfgsb::{optim_lbfgsb_with_profile, ArithmeticProfile, Bounds, OptimControl};
 use serde_json::Value;
 
 fn nums(v: &Value) -> Vec<f64> {
@@ -26,6 +27,7 @@ fn check(fixture: Value, reference: Value, expected_cases: usize, value_toleranc
     let mut old_errors = Vec::new();
     let mut max_increase = 0.0_f64;
     let mut improved = 0;
+    let mut observed_bookkeeping_differences = 0;
     for contrast in fixture["contrasts"].as_array().unwrap() {
         let design: Vec<_> = contrast["design"]
             .as_array()
@@ -60,36 +62,27 @@ fn check(fixture: Value, reference: Value, expected_cases: usize, value_toleranc
                 &nums(&case["counts"]),
                 case["dispersion"].as_f64().unwrap(),
             );
-            let result = optim_lbfgsb(
+            let result = optim_lbfgsb_with_profile(
                 start,
                 Bounds::new(nums(&case["lower"]), nums(&case["upper"])).unwrap(),
                 |beta| objective.value(beta),
                 OptimControl::default_for_dimension(dimension),
+                ArithmeticProfile::R461MacArm,
             )
             .unwrap();
-            let error = result
-                .par
-                .iter()
-                .zip(nums(&fit["beta"]))
-                .map(|(a, b)| (a - b).abs())
-                .fold(0.0_f64, f64::max);
+            let expected = support::recorded_result(&fit["optimizer_result"]);
+            assert_eq!(expected.par, nums(&fit["beta"]));
+            let comparison =
+                support::compare_scientific(&result, &expected, old_error + 1e-6, value_tolerance);
             assert!(
-                error <= old_error + 1e-6,
-                "{} regressed beyond the agreed 1e-6 allowance: old={old_error:e}, new={error:e}",
-                case["fixture"]
+                comparison.failures.is_empty(),
+                "{}: {}",
+                case["fixture"],
+                comparison.failures.join("; ")
             );
-            assert_eq!(
-                result.convergence as i64,
-                fit["optimizer_result"]["convergence"].as_i64().unwrap(),
-                "{} changed convergence status",
-                case["fixture"]
-            );
-            assert!(
-                (result.value - fit["optimizer_result"]["value"].as_f64().unwrap()).abs()
-                    <= value_tolerance,
-                "{} objective scale/endpoint drift",
-                case["fixture"]
-            );
+            observed_bookkeeping_differences +=
+                usize::from(!comparison.bookkeeping_differences.is_empty());
+            let error = comparison.max_parameter_error;
             if error <= old_error {
                 improved += 1;
             }
@@ -108,6 +101,7 @@ fn check(fixture: Value, reference: Value, expected_cases: usize, value_toleranc
         "worst-case precision gate: old={old_max:e}, new={new_max:e}"
     );
     assert!(errors[expected_cases / 2] <= old_errors[expected_cases / 2]);
+    eprintln!("{observed_bookkeeping_differences}/{expected_cases} fits differ in observed counts/message; scientific accuracy is checked separately");
     eprintln!("{expected_cases} fits: worst {old_max:e} -> {new_max:e} ({:.1}x); {improved} improved/equal; largest increase={max_increase:e}", old_max / new_max);
 }
 

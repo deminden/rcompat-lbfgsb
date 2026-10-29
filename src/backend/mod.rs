@@ -6,6 +6,9 @@ use crate::result::OptimCounts;
 pub(crate) use native::NativeBackend;
 
 pub(crate) trait BackendProblem {
+    const OBSERVED: bool = false;
+    fn observe(&mut self, _event: crate::OptimEvent) {}
+
     fn value(&mut self, x: &[f64]) -> Result<f64, OptimError>;
 
     fn gradient(&mut self, x: &[f64]) -> Result<Vec<f64>, OptimError>;
@@ -19,17 +22,21 @@ pub(crate) trait BackendProblem {
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct BackendControl {
+    pub(crate) profile: crate::profile::ArithmeticProfile,
     pub(crate) maxit: usize,
     pub(crate) factr: f64,
     pub(crate) pgtol: f64,
     pub(crate) lmm: usize,
     pub(crate) trace: usize,
     pub(crate) report: usize,
+    #[cfg(test)]
     pub(crate) has_user_gradient: bool,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct BackendResult {
+    pub(crate) reason: crate::TerminationReason,
+    pub(crate) iterations: usize,
     pub(crate) x: Vec<f64>,
     pub(crate) value: f64,
     pub(crate) counts: OptimCounts,

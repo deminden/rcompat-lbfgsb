@@ -27,14 +27,29 @@ mod backend;
 mod bounds;
 mod compat;
 mod control;
+mod diagnostics;
 mod error;
 mod finite_diff;
 mod objective;
+mod profile;
 mod result;
 mod scaling;
 
 pub use bounds::Bounds;
-pub use compat::{optim_lbfgsb, optim_lbfgsb_with_gradient};
+pub use compat::{
+    optim_lbfgsb, optim_lbfgsb_with_gradient, optim_lbfgsb_with_gradient_and_profile,
+    optim_lbfgsb_with_profile,
+};
 pub use control::OptimControl;
 pub use error::OptimError;
+pub use profile::ArithmeticProfile;
 pub use result::{OptimCounts, OptimResult};
+
+pub use diagnostics::{
+    HistoryUpdate, LineSearchFailure, ModelSnapshot, OptimEvent, OptimObserver, RecoveryReason,
+    TerminationReason,
+};
+
+pub use compat::{optim_lbfgsb_observed, optim_lbfgsb_with_gradient_observed};
+
+pub use diagnostics::StepAcceptance;

@@ -21,6 +21,12 @@ outputs were regenerated with R 4.6.1 on 2026-07-22; all 68 cases currently
 reproduce the saved parameters, values, counts, convergence codes, and messages
 bit-for-bit on the pinned callback arithmetic.
 
+For 0.3.0, the full-result replay requires Linux x86 and is mandatory in pinned
+debug/release CI. Enable result-bit checks with `LBFGSB_EXACT_REFERENCE=1`.
+Other hosts explicitly ignore that replay and run the separate portable
+scientific test with the same 1e-8 parameter/value limits and convergence status;
+counts and messages remain reported observations in that accuracy tier.
+
 For broader local sweeps, regenerate with `DESEQ_FIXTURE_GENES=all` and run the
 DESeq test with `DESEQ_PARITY_SCAN=1`. Optional verbose and trace controls are
 documented alongside the test implementation.

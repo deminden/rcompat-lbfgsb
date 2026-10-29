@@ -1,4 +1,4 @@
-use crate::error::OptimError;
+use crate::error::{checked_finite, OptimError};
 
 pub(crate) fn finite_difference_gradient<F>(
     x: &[f64],
@@ -12,6 +12,7 @@ where
 {
     let mut gradient = vec![0.0; x.len()];
 
+    let mut candidate = x.to_vec();
     for index in 0..x.len() {
         let h = ndeps[index];
         let forward_room = if upper[index].is_finite() {
@@ -29,16 +30,42 @@ where
         let backward_step = h.min(backward_room);
 
         let denominator = forward_step + backward_step;
+        checked_finite(denominator, "finite-difference denominator", Some(index))?;
         if denominator > 0.0 {
-            let mut plus = x.to_vec();
-            let mut minus = x.to_vec();
-            plus[index] += forward_step;
-            minus[index] -= backward_step;
-            let f_plus = objective(&plus)?;
-            let f_minus = objective(&minus)?;
-            gradient[index] = (f_plus - f_minus) / denominator;
-        } else {
+            if x[index] + forward_step == x[index] && x[index] - backward_step == x[index] {
+                return Err(OptimError::InvalidControl {
+                    field: "ndeps",
+                    reason: format!(
+                        "stencil cannot perturb coordinate {index} at its current magnitude"
+                    ),
+                });
+            }
+            candidate[index] = checked_finite(
+                x[index] + forward_step,
+                "forward finite-difference coordinate",
+                Some(index),
+            )?;
+            let f_plus = objective(&candidate)?;
+            candidate[index] = checked_finite(
+                x[index] - backward_step,
+                "backward finite-difference coordinate",
+                Some(index),
+            )?;
+            let f_minus = objective(&candidate)?;
+            candidate[index] = x[index];
+            gradient[index] = checked_finite(
+                (f_plus - f_minus) / denominator,
+                "finite-difference gradient",
+                Some(index),
+            )?;
+        } else if lower[index] == upper[index] {
             gradient[index] = 0.0;
+        } else {
+            return Err(OptimError::InvalidGradient {
+                index: Some(index),
+                value: Some(denominator),
+                reason: "finite-difference stencil has no positive span".to_owned(),
+            });
         }
     }
 

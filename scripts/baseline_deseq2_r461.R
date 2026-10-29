@@ -11,6 +11,8 @@ script_path <- if (is.na(script_arg)) {
   sub("^--file=", "", script_arg)
 }
 repo_root <- normalizePath(file.path(dirname(script_path), ".."))
+source(file.path(repo_root,"scripts","oracle_json.R"))
+file_sha256 <- function(path) strsplit(system2("shasum",c("-a","256",shQuote(path)),stdout=TRUE),"[[:space:]]+")[[1]][[1]]
 fixture_path <- if (length(args) >= 1L) args[[1L]] else {
   file.path(repo_root, "fixtures", "deseq_hard_real_subset", "optim_cases.json")
 }
@@ -135,8 +137,16 @@ results <- unlist(lapply(fixture$contrasts, function(contrast) {
 untrace("optim", where = asNamespace("stats"))
 
 dir.create(dirname(out_path), recursive = TRUE, showWarnings = FALSE)
-write_json(
+write_verified_oracle_json(
   list(
+    generator = "scripts/baseline_deseq2_r461.R",
+    generator_sha256 = file_sha256(script_path),
+    serializer_sha256 = file_sha256(file.path(repo_root,"scripts","oracle_json.R")),
+    input_sha256 = file_sha256(fixture_path),
+    blas = unname(extSoftVersion()[["BLAS"]]),
+    threads = Sys.getenv("OPENBLAS_NUM_THREADS"),
+    build_config = lapply(setNames(c("CC","CFLAGS","CXX","CXXFLAGS","FC","FFLAGS"),c("CC","CFLAGS","CXX","CXXFLAGS","FC","FFLAGS")),function(key)system2(file.path(R.home("bin"),"R"),c("CMD","config",key),stdout=TRUE)),
+    session = capture.output(sessionInfo()),
     fixture = fixture$fixture,
     r_version = R.version.string,
     platform = R.version$platform,
@@ -146,11 +156,6 @@ write_json(
     maxit = maxit,
     results = results
   ),
-  path = out_path,
-  pretty = TRUE,
-  auto_unbox = TRUE,
-  digits = 17L,
-  null = "null",
-  na = "null"
+  path = out_path
 )
 cat("Wrote ", length(results), " real DESeq2 fits to ", out_path, "\n", sep = "")

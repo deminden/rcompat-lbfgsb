@@ -1,4 +1,5 @@
 #![allow(missing_docs)]
+mod support;
 
 use std::collections::HashMap;
 use std::env;
@@ -6,7 +7,8 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use rcompat_lbfgsb::{optim_lbfgsb, Bounds, OptimControl};
+use rcompat_lbfgsb::{Bounds, OptimControl};
+use support::optim_x86 as optim_lbfgsb;
 
 const DATA_ROOT: &str = "data/lbfgsb_synthetic_stress_2026-07-22";
 const DESEQ2_BETA_SCALE: f64 = std::f64::consts::LN_2;
@@ -66,11 +68,8 @@ struct ScanFailure {
 }
 
 #[test]
+#[ignore = "requires external synthetic oracle bundle; run explicitly with --ignored"]
 fn synthetic_stress_can_scan_ignored_reference_data() {
-    if env::var_os("LBFGSB_SYNTHETIC_STRESS_SCAN").is_none() {
-        return;
-    }
-
     let data_root =
         env::var("LBFGSB_SYNTHETIC_STRESS_DATA_ROOT").unwrap_or_else(|_| DATA_ROOT.to_owned());
     let root = Path::new(&data_root);
@@ -83,6 +82,12 @@ fn synthetic_stress_can_scan_ignored_reference_data() {
     let par_tolerance = env_f64("LBFGSB_SYNTHETIC_STRESS_PAR_TOL").unwrap_or(5e-3);
     let value_tolerance = env_f64("LBFGSB_SYNTHETIC_STRESS_VALUE_TOL").unwrap_or(1e-5);
     let value_relative_tolerance = env_f64("LBFGSB_SYNTHETIC_STRESS_VALUE_REL_TOL").unwrap_or(1e-8);
+    for tolerance in [par_tolerance, value_tolerance, value_relative_tolerance] {
+        assert!(
+            tolerance.is_finite() && tolerance >= 0.0,
+            "scan tolerances must be finite and nonnegative"
+        );
+    }
     let strict = env::var_os("LBFGSB_SYNTHETIC_STRESS_STRICT").is_some();
     let verbose = env::var_os("LBFGSB_SYNTHETIC_STRESS_VERBOSE").is_some();
     let raw_trace = env::var_os("LBFGSB_SYNTHETIC_STRESS_RAW_TRACE").is_some();
@@ -100,6 +105,7 @@ fn synthetic_stress_can_scan_ignored_reference_data() {
     let mut value_close = 0_usize;
     let mut both_close = 0_usize;
     let mut exact_count_matches = 0_usize;
+    let mut complete_matches = 0_usize;
     let mut failures = Vec::new();
 
     for case in cases.into_iter().take(limit) {
@@ -190,8 +196,30 @@ fn synthetic_stress_can_scan_ignored_reference_data() {
         value_close += usize::from(row_value_close);
         both_close += usize::from(row_par_close && row_value_close);
         exact_count_matches += usize::from(count_delta == 0);
+        let expected = rcompat_lbfgsb::OptimResult {
+            par: problem.optim_par.clone(),
+            value: problem.case.optim_value,
+            counts: rcompat_lbfgsb::OptimCounts {
+                function: problem.case.optim_fn_count,
+                gradient: problem.case.optim_gr_count,
+            },
+            convergence: problem.case.optim_convergence,
+            message: problem.case.optim_message.clone(),
+        };
+        let effective_value_tolerance = value_tolerance
+            .max(value_relative_tolerance * result.value.abs().max(expected.value.abs()).max(1.0));
+        let complete_match = support::compare(
+            &result,
+            &expected,
+            support::Contract::Numerical {
+                parameters: par_tolerance,
+                value: effective_value_tolerance,
+            },
+        )
+        .is_empty();
+        complete_matches += usize::from(complete_match);
 
-        if verbose || !(row_par_close && row_value_close) {
+        if verbose || !complete_match {
             println!(
                 "SYNTHETIC_STRESS_SCAN\t{}\tpar_close={}\tvalue_close={}\tpar_err={:.17e}\tvalue_err={:.17e}\tvalue_rel_err={:.17e}\tcount_delta={}\tactual_counts={}/{}\texpected_counts={}/{}\tpg={:.17e}\ttarget_pg={:.17e}\tconv={}\texpected_conv={}",
                 problem.case.case_id,
@@ -222,7 +250,7 @@ fn synthetic_stress_can_scan_ignored_reference_data() {
             }
         }
 
-        if !(row_par_close && row_value_close) {
+        if !complete_match {
             failures.push(ScanFailure {
                 case_id: problem.case.case_id,
                 par_error,
@@ -267,16 +295,29 @@ fn synthetic_stress_can_scan_ignored_reference_data() {
     }
 
     if strict {
-        assert_eq!(both_close, total, "synthetic stress parity scan failures");
+        let expected_cases = if only_case.is_some() {
+            1
+        } else {
+            selected_cases.as_ref().map_or(limit, Vec::len)
+        };
+        assert!(
+            expected_cases > 0,
+            "strict scan selected no reference cases"
+        );
+        assert_eq!(
+            total, expected_cases,
+            "strict scan did not execute every requested case"
+        );
+        assert_eq!(
+            complete_matches, total,
+            "synthetic stress full-result parity failures"
+        );
     }
 }
 
 #[test]
+#[ignore = "requires external synthetic oracle bundle; run explicitly with --ignored"]
 fn synthetic_stress_can_replay_saved_r461_objectives_exactly() {
-    if env::var_os("LBFGSB_SYNTHETIC_STRESS_OBJECTIVE_REPLAY").is_none() {
-        return;
-    }
-
     let data_root =
         env::var("LBFGSB_SYNTHETIC_STRESS_DATA_ROOT").unwrap_or_else(|_| DATA_ROOT.to_owned());
     let root = Path::new(&data_root);
@@ -789,11 +830,7 @@ fn projected_gradient_norm(x: &[f64], gradient: &[f64], lower: &[f64], upper: &[
 }
 
 fn max_abs_delta(left: &[f64], right: &[f64]) -> f64 {
-    assert_eq!(left.len(), right.len());
-    left.iter()
-        .zip(right.iter())
-        .map(|(&left, &right)| (left - right).abs())
-        .fold(0.0, f64::max)
+    support::parameter_error(left, right)
 }
 
 fn format_vector(values: &[f64]) -> String {

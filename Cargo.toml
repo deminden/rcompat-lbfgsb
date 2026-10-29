@@ -1,14 +1,15 @@
 [package]
 name = "rcompat-lbfgsb"
-version = "0.2.2"
+version = "0.3.0"
 edition = "2021"
+rust-version = "1.87"
 license = "MIT"
 description = "Rust implementation of R-style stats::optim L-BFGS-B behavior "
 readme = "README.md"
 repository = "https://github.com/deminden/rcompat-lbfgsb"
 categories = ["algorithms", "science"]
 keywords = ["optimization", "lbfgsb", "r", "compatibility"]
-exclude = ["external/**", "data/**", "target/**", ".codex-local/**", "Cargo.lock"]
+exclude = ["external/**", "data/**", "target/**", "**/__pycache__/**", "**/*.pyc", "Cargo.lock"]
 
 [dependencies]
 
@@ -16,15 +17,28 @@ exclude = ["external/**", "data/**", "target/**", ".codex-local/**", "Cargo.lock
 # R 4.6.1 macOS ARM / Clang contraction and Vortex short-dot arithmetic.
 arm-fma = []
 
-[[example]]
-name = "deseq2"
-required-features = ["arm-fma"]
-
 [dev-dependencies]
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.150", features = ["float_roundtrip"] }
+stats_alloc = "=0.1.10"
 
 [lints.rust]
 unsafe_code = "forbid"
 missing_docs = "warn"
 rust_2018_idioms = { level = "warn", priority = -1 }
+
+[[bench]]
+name = "backend_cost"
+harness = false
+
+[[bench]]
+name = "observer_cost"
+harness = false
+
+[[bench]]
+name = "allocation_growth"
+harness = false
+
+[[bench]]
+name = "api_options"
+harness = false

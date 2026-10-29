@@ -49,9 +49,9 @@ paraphrased into the Rust implementation.
 - Independently written Rust code in this repository.
 - Permissively licensed dependencies after their licenses have been verified.
 
-## Pinned validation stack
+## Historical pinned validation stack
 
-The current reference generation and final validation were completed on
+The archived x86 reference generation and validation were recorded on
 2026-07-22 with:
 
 - R 4.6.1 (2026-06-24), platform `x86_64-conda-linux-gnu`;
@@ -162,10 +162,12 @@ or finite differences. Objective-only bound classification and fallback
 direction projection retain their separately validated activity rules. No R,
 C, or Fortran implementation text was copied or paraphrased.
 
-The final R 4.6.1 validation is bit-exact for all 68 committed DESeq
+The archived R 4.6.1 validation reported bit-exact results for all 68 committed DESeq
 supplied-gradient cases, all 48 committed hard-real objective-only cases, and
 all 512 ignored synthetic stress cases, including optimizer counts and public
-status. The DESeq test replay models the recorded platform's extended-precision
+status. That historical synthetic bundle is unavailable in this checkout;
+the current replacement has its own provenance and contracts. The DESeq test
+replay models the recorded platform's extended-precision
 `sum()` and permissively licensed OpenBLAS DGEMV reduction shapes so callback
 arithmetic is not mistaken for optimizer drift. No runtime dependency on R or
 OpenBLAS was added.
@@ -225,3 +227,174 @@ dev/transitive licenses:
 - `syn`: MIT OR Apache-2.0
 - `unicode-ident`: (MIT OR Apache-2.0) AND Unicode-3.0
 - `zmij`: MIT
+
+## Mixed/infinite-bound oracle, 2026-10-29
+
+`fixtures/mixed_bounds/cases.json` contains 37 independently defined quadratic
+and linear black-box calls made by `scripts/generate_mixed_bound_fixtures.R`.
+The recorded R 4.6.1 macOS ARM environment was executed directly with
+OPENBLAS_NUM_THREADS=1 set before process startup. The manifest embeds the full
+session, BLAS library path, declared thread setting and the generator SHA256.
+Every numeric field is reread and checked through its binary64 byte encoding
+before an atomic artifact replacement. `scripts/verify_mixed_bound_fixture.py`
+checks the fixed recipe hash, case count, unique IDs and environment metadata
+without R. No optimizer source code was consulted or used as implementation input.
+
+The cases cover dimensions 1,2,4,13, supplied and numerical gradients, finite,
+mixed and infinite bounds, shallow curvature, maxit=0 and linear step expansion.
+The four rounded-plateau/unrepresentable-target cases use exact result-bit
+contracts; other cases check counts/status/messages exactly and endpoints and
+initial calls to declared numerical tolerances. The generator is an oracle
+recipe, not a runtime dependency. Its outputs demonstrate that factr=0 retains
+a zero reduction threshold and can accept a rounded-zero reduction. The prior
+architecture statement that factr=0 disabled this check was corrected against
+these new black-box observations.
+
+## Line-search recovery oracle, 2026-10-29
+
+`fixtures/line_search/cases.json` adds six public R 4.6.1 calls from
+`scripts/generate_line_search_fixtures.R`, using the same separately recorded
+macOS ARM environment as the mixed-bound oracle. Each case stores every raw
+objective argument as well as the complete result. Independent quadratic and
+absolute-distance objectives exercise trial exhaustion, narrow-bracket
+best-point restoration, and one history reset before final exhaustion. Two
+scenarios deliberately supply inconsistent gradients to exercise failure
+handling; they are not scientific optimization models. All six complete
+results and raw parameter traces match the explicit ARM profile bit for bit.
+
+The generator verifies binary64 round trips and was replayed to a separate
+path with byte-identical output. `scripts/verify_oracles.py` now pins payload
+SHA256 values and recipe fingerprints for both new corpora. Its corruption
+checks reject changes to parameters, objectives, counts, status, messages,
+case availability and oracle metadata. R remains absent from the library,
+normal test execution and verification commands. No R/GPL source was consulted.
+
+## Native R 4.6.2 and approved replacement corpus, 2026-10-29
+
+The user requested a separate R 4.6.2 environment, DESeq2 installation and
+native CPU compilation, and approved replacing the unavailable historical
+512-case stress data with new generated cases. `deseq2-r462-native` contains
+source-built R 4.6.2 and DESeq2 1.52.0, with -O3 -mcpu=native -fPIC, Clang
+23.1.3, GNU Fortran 16.2.0 and OpenBLAS 0.3.34 on Apple Silicon. The verified
+16-gene smoke fit made 16 optimizer calls and returned finite coefficients.
+The old R 4.6.1 environment still loads. Copied R-package loader paths were
+relocated in independent files rather than allowing a second old R runtime
+into the new process. A package load crash exposed this issue before any new
+reference was accepted.
+
+`fixtures/native_r462/environment.json` records source SHA256, compilers, flags,
+CPU, runtime, session and build recipes. R's archive was downloaded from CRAN
+and compiled in an external cache; no R optimizer implementation source was
+read or used to implement this crate. No GPL code or binary is packaged with
+the library. Source-building R for an external oracle does not add a runtime
+dependency. Conda's copied bootstrap package record is not the version authority
+for the subsequently source-built runtime.
+
+The new package captures contain 48 historical and 28 airway fits, including
+74 actual optimizer routes. Their accuracy comparisons rerun the previous Rust
+callback against the new R 4.6.2 results. Both debug and native release retain
+the 10.9x/217577.7x worst-case gains. Their full input/recipe/serializer hashes,
+R version, flags and session are stored in the artifacts. The scientific
+accuracy contract records count/message differences separately; exact result
+contracts still require equality of every bookkeeping field.
+
+`fixtures/synthetic_v1/cases.json` is a newly defined 512-case corpus. It does
+not reproduce the missing historical inputs. It covers four mathematical
+families, eight dimensions, four bound routes, two initializations and both
+gradient forms. The active replay now matches 512/512 complete-result contracts,
+with the former last case additionally checked by an exact callback witness.
+Payload integrity is not asserted as proof of optimizer
+parity. The shared JSON writer preserves signed zero and verifies binary64
+round trips before atomic replacement. Integrity and actual replay-harness
+corruption tests are separate.
+
+## Public BLAS arithmetic calibration and profiling, 2026-10-29
+
+The new independent scripts/probe_reference_blas.c calls only public DDOT.
+scripts/generate_blas_oracle.py compiles it with the reference compiler/native
+flags and invokes it with one BLAS thread. fixtures/arithmetic records 200
+binary64 outputs, the exact OpenBLAS dylib hash/configuration, CPU, compiler,
+flags and recipe/source hashes. No BLAS or optimizer implementation source was
+read, copied or used. The result identifies the ARM long-dot reduction order
+and verifies the independently written Rust contiguous/indexed reductions.
+A second capture reproduces payload and environment metadata byte for byte.
+The separate integrity CLI verifies these frozen hashes without loading BLAS.
+
+Additional contraction calibration uses public R optimizer callback traces and
+independent C expressions for mathematical interpolation, with native compiler
+contraction enabled/disabled. Inspecting assembly of those original mathematical
+probes does not involve inspecting R's implementation. These corrections raise
+replacement-corpus matching to 511/512 at that checkpoint; the cached YY
+association fix described below resolves the final case. The gate is unchanged
+and contains no exclusions.
+
+measurements/2026-10-29 records the allocation probe's compiler, CPU, commands,
+source/buffer patch hashes and before/after/native CSV hashes. A temporary copy
+of the pre-reuse source independently reproduced all 224 allocation totals and
+complete-result fingerprints. The allocator wrapper is MIT-licensed stats_alloc
+0.1.10, used only as a development dependency through its safe public interface
+(https://docs.rs/stats_alloc/0.1.10/stats_alloc/). No allocator implementation was
+copied into the crate. Its atomic instrumentation and callback timers are part
+of the measured runtime; cumulative bytes are not represented as peak memory.
+
+## Triangular-solve probe and API measurements, 2026-10-29
+
+scripts/probe_reference_triangular.c independently calls public upper-triangular
+BLAS DTRSV in transpose/nontranspose forms. All 15872 calls (dimensions 1..31,
+256 seeds) match mathematical unblocked fused solves bit for bit. This rules out
+that kernel as the cause of the then-remaining stress discrepancy; it alone is
+not evidence of complete optimizer parity. The source/hash and reference
+environment are recorded in measurements/2026-10-29/api_environment.json.
+No upstream numerical implementation source was consulted.
+
+The same manifest fingerprints all sources used by the private callback API
+prototypes and four before/after portable/native captures. Cargo.measured.toml
+freezes the exact manifest used by the refreshed three-phase measurements. Each
+phase builds in an independent target directory. Reversing
+callback_allocation.patch and buffer_reuse.patch in an isolated copy reconstructs
+the earlier allocation baseline. Local replay verified the API baseline's 192
+complete-result fingerprints and allocation/exponential metrics exactly.
+
+## Exact active-set witness and runtime observation, 2026-10-29
+
+The last stress discrepancy was a cached YY-product update during simultaneous
+entry/exit of free variables. The reference evaluates (old + enter) - leave;
+taking enter-leave first changes one rounding step. A console-only precision
+adapter exposed existing public diagnostic values; public DDOT/DAXPY call
+arguments/results then identified the first hidden factor difference at
+iteration 6, before the first callback difference at iteration 11. Applying
+that association only to YY preserves every one of the 1472 raw objective
+arguments/values and complete final result bits. Reassociating the other cache
+blocks changes earlier bits and was rejected, even when endpoint tolerances
+happened to pass.
+
+scripts/trace_reference_runtime.c and capture_reference_trace.py are original
+external observation tools. They forward the same public stdio/BLAS calls,
+raise literal double printf precision and optionally record numeric BLAS inputs/
+outputs. The loader mechanism uses the public macOS interposing ABI described
+by Apple's dyld interface header; no loader implementation code is copied.
+R's public printing interface is documented in Writing R Extensions, section 6.5
+(https://stat.ethz.ch/CRAN/doc/manuals/r-devel/R-exts.html#Printing).
+The interface header is at
+https://github.com/apple-oss-distributions/dyld/blob/main/include/mach-o/dyld-interposing.h.
+No R/GPL optimizer implementation source or private memory is inspected.
+No adapter binary or R/BLAS library is packaged with the crate.
+
+The runner checks 13 format/argument-preservation cases, compiles with native
+CPU flags outside the checkout, and requires complete R result-bit equality
+before accepting a trace. Its manifest records the R library/executable and
+BLAS SHA256 values, configured compiler flags, CPU, source/input/trace hashes
+and one-thread settings. The capture contains 20559 public BLAS calls; normal
+replay needs only the compact witness under fixtures/active_set. That artifact
+retains 64 base calls, exact final results and a digest of all 1472 raw calls,
+with generation and extraction recipes fingerprinted separately. The source
+case is already in the committed replacement corpus. R 4.6.1 and R 4.6.2 were
+independently replayed and their full raw callback sequences match bit for bit.
+
+All performance phases were refreshed with this arithmetic correction applied
+consistently. Their complete-result fingerprints and allocation counts/bytes
+match the earlier measurements in all 224 or 192 configurations respectively.
+An initial refresh reused a stale build across temporary source copies; the
+allocation verifier rejected it. Independent build directories produced the
+accepted evidence. The old timing captures remain in the prior Git checkpoint;
+current commands, data and source fingerprints describe the corrected source.

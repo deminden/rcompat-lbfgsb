@@ -38,6 +38,9 @@ fn factr_stop_defers_small_gradient_band_for_clipped_finite_difference_boxes() {
 #[test]
 fn factr_stop_defers_only_large_objective_only_backtracked_steps() {
     let mut step = Step {
+        acceptance: StepAcceptance::Armijo,
+        initial_derivative: -1.0,
+        final_derivative: 0.0,
         x: vec![0.0],
         value: 0.0,
         gradient: vec![0.0],
@@ -180,6 +183,7 @@ fn subspace_free_set_requires_exact_bound_hit() {
 #[test]
 fn exact_bound_activity_is_limited_to_objective_only_finite_boxes() {
     let objective_only = BackendControl {
+        profile: ArithmeticProfile::legacy(),
         has_user_gradient: false,
         maxit: 100,
         factr: 1e7,
@@ -189,6 +193,7 @@ fn exact_bound_activity_is_limited_to_objective_only_finite_boxes() {
         report: 10,
     };
     let supplied_gradient = BackendControl {
+        profile: ArithmeticProfile::legacy(),
         has_user_gradient: true,
         maxit: 100,
         factr: 1e7,
@@ -215,6 +220,7 @@ fn exact_bound_activity_is_limited_to_objective_only_finite_boxes() {
 #[test]
 fn exact_compact_path_uses_raw_factr_lmm_and_maxit_controls() {
     let control = BackendControl {
+        profile: ArithmeticProfile::legacy(),
         has_user_gradient: false,
         maxit: 100,
         factr: 1e7,
@@ -325,6 +331,13 @@ fn exact_more_thuente_warning_restores_and_accepts_only_at_task_width() {
         true
     ));
 
+    assert!(!more_thuente_accepts_warning(
+        true,
+        true,
+        best,
+        wider_other,
+        true
+    ));
     assert!(more_thuente_accepts_warning(
         false,
         true,
@@ -363,6 +376,7 @@ fn more_thuente_cubic_steps_are_mirror_symmetric() {
 
     assert_mirrored_steps(
         more_thuente_cubic_case_two(
+            ArithmeticProfile::legacy(),
             right_best,
             MoreThuentePoint {
                 alpha: 1.0,
@@ -371,6 +385,7 @@ fn more_thuente_cubic_steps_are_mirror_symmetric() {
             },
         ),
         more_thuente_cubic_case_two(
+            ArithmeticProfile::legacy(),
             left_best,
             MoreThuentePoint {
                 alpha: -1.0,
@@ -382,6 +397,7 @@ fn more_thuente_cubic_steps_are_mirror_symmetric() {
 
     assert_mirrored_steps(
         more_thuente_cubic_case_three(
+            ArithmeticProfile::legacy(),
             right_best,
             MoreThuentePoint {
                 alpha: 1.0,
@@ -390,6 +406,7 @@ fn more_thuente_cubic_steps_are_mirror_symmetric() {
             },
         ),
         more_thuente_cubic_case_three(
+            ArithmeticProfile::legacy(),
             left_best,
             MoreThuentePoint {
                 alpha: -1.0,
@@ -401,6 +418,7 @@ fn more_thuente_cubic_steps_are_mirror_symmetric() {
 
     assert_mirrored_steps(
         more_thuente_cubic_case_four(
+            ArithmeticProfile::legacy(),
             MoreThuentePoint {
                 alpha: 2.0,
                 value: 0.5,
@@ -413,6 +431,7 @@ fn more_thuente_cubic_steps_are_mirror_symmetric() {
             },
         ),
         more_thuente_cubic_case_four(
+            ArithmeticProfile::legacy(),
             MoreThuentePoint {
                 alpha: -2.0,
                 value: 0.5,
@@ -681,6 +700,7 @@ fn line_search_reports_zero_trials_for_accepted_full_step() {
     let step = line_search(
         &mut problem,
         LineSearchRequest {
+            profile: ArithmeticProfile::legacy(),
             x: &[0.0],
             value: 4.0,
             gradient: &[-4.0],
@@ -718,11 +738,19 @@ fn line_search_candidate_copies_exact_unit_step_target() {
     let x = [-25.060655267031027];
     let target = [30.0];
     let direction = [target[0] - x[0]];
-    let recomputed = bounded_step(&x, &direction, 1.0, &[-30.0], &[30.0]);
+    let recomputed = bounded_step(
+        ArithmeticProfile::legacy(),
+        &x,
+        &direction,
+        1.0,
+        &[-30.0],
+        &[30.0],
+    );
     assert_ne!(recomputed[0].to_bits(), target[0].to_bits());
 
     let candidate = line_search_candidate(
         &LineSearchRequest {
+            profile: ArithmeticProfile::legacy(),
             x: &x,
             value: 0.0,
             gradient: &[-1.0],
@@ -755,6 +783,7 @@ fn exact_line_search_candidate_keeps_feasible_bound_roundoff() {
         let candidate = |exact_operations| {
             line_search_candidate(
                 &LineSearchRequest {
+                    profile: ArithmeticProfile::legacy(),
                     x: &x,
                     value: 0.0,
                     gradient: &[-1.0],
@@ -813,14 +842,21 @@ fn more_thuente_case_three_respects_exact_feasible_step_cap() {
         let step_cap = max_feasible_step(&x, &direction, &[-30.0], &[30.0]);
         assert_eq!(step_cap.to_bits(), expected);
 
-        let cubic = more_thuente_cubic_case_three(best, trial).expect("case-three cubic step");
+        let cubic = more_thuente_cubic_case_three(ArithmeticProfile::legacy(), best, trial)
+            .expect("case-three cubic step");
         assert!(cubic > step_cap);
         let mut state = MoreThuenteStepState {
             best,
             other: best,
             bracketed: false,
         };
-        let next = more_thuente_step(&mut state, trial, 0.0, step_cap);
+        let next = more_thuente_step(
+            ArithmeticProfile::legacy(),
+            &mut state,
+            trial,
+            0.0,
+            step_cap,
+        );
         assert_eq!(next.to_bits(), expected);
     }
 
@@ -884,6 +920,7 @@ fn line_search_reports_interpolated_trial_after_rejected_full_step() {
     let step = line_search(
         &mut problem,
         LineSearchRequest {
+            profile: ArithmeticProfile::legacy(),
             x: &[0.0],
             value: 4.0,
             gradient: &[-4.0],
@@ -922,6 +959,7 @@ fn line_search_diagnoses_armijo_step_that_is_too_short_for_wolfe_curvature() {
     let step = line_search(
         &mut problem,
         LineSearchRequest {
+            profile: ArithmeticProfile::legacy(),
             x: &[0.0],
             value: 4.0,
             gradient: &[-4.0],
@@ -959,6 +997,7 @@ fn more_thuente_accepts_r_max_step_warning_case() {
     let step = more_thuente_line_search(
         &mut problem,
         LineSearchRequest {
+            profile: ArithmeticProfile::legacy(),
             x: &[0.0],
             value: 0.0,
             gradient: &[-1.0],
@@ -995,6 +1034,7 @@ fn strong_wolfe_line_search_expands_beyond_unit_alpha_when_direction_is_short() 
     let step = strong_wolfe_line_search(
         &mut problem,
         LineSearchRequest {
+            profile: ArithmeticProfile::legacy(),
             x: &[0.0],
             value: 4.0,
             gradient: &[-4.0],
@@ -1032,6 +1072,7 @@ fn strong_wolfe_line_search_zooms_after_overlarge_unit_step() {
     let step = strong_wolfe_line_search(
         &mut problem,
         LineSearchRequest {
+            profile: ArithmeticProfile::legacy(),
             x: &[0.0],
             value: 4.0,
             gradient: &[-4.0],
@@ -1068,6 +1109,7 @@ fn strong_wolfe_line_search_accepts_armijo_step_at_feasible_cap() {
     let step = strong_wolfe_line_search(
         &mut problem,
         LineSearchRequest {
+            profile: ArithmeticProfile::legacy(),
             x: &[0.0],
             value: 4.0,
             gradient: &[-4.0],
@@ -1106,6 +1148,7 @@ fn strong_wolfe_line_search_propagates_evaluation_errors() {
     let error = strong_wolfe_line_search(
         &mut problem,
         LineSearchRequest {
+            profile: ArithmeticProfile::legacy(),
             x: &[0.0],
             value: 4.0,
             gradient: &[-4.0],
@@ -1447,6 +1490,7 @@ fn more_thuente_first_step_full_probe_matches_r_trace_prefix() {
             &[-5.0, -5.0],
             &[5.0, 5.0],
             BackendControl {
+                profile: ArithmeticProfile::legacy(),
                 maxit: 100,
                 factr: 1e7,
                 pgtol: 0.0,
@@ -1502,6 +1546,7 @@ fn cauchy_more_thuente_full_probe_matches_r_trace_prefix_and_counts() {
             &[-5.0, -5.0],
             &[5.0, 5.0],
             BackendControl {
+                profile: ArithmeticProfile::legacy(),
                 maxit: 100,
                 factr: 1e7,
                 pgtol: 0.0,
@@ -1572,6 +1617,7 @@ fn fourth_iteration_more_thuente_extrapolates_to_r_trace_step() {
     );
 
     let direction = cauchy_subspace_direction(
+        ArithmeticProfile::legacy(),
         &x3,
         &g3,
         &lower,
@@ -1588,6 +1634,7 @@ fn fourth_iteration_more_thuente_extrapolates_to_r_trace_step() {
     let step = line_search_with_mode(
         &mut recording,
         LineSearchRequest {
+            profile: ArithmeticProfile::legacy(),
             x: &x3,
             value,
             gradient: &g3,
@@ -1644,6 +1691,7 @@ fn capped_cauchy_subspace_first_step_matches_r_trace_shape() {
         &upper,
         &history,
         DirectionSettings {
+            profile: ArithmeticProfile::legacy(),
             mode: modes.direction,
             bound_activity: BoundActivity::Tolerant,
             min_step: MIN_STEP,
@@ -1655,6 +1703,7 @@ fn capped_cauchy_subspace_first_step_matches_r_trace_shape() {
     let step = line_search(
         &mut problem,
         LineSearchRequest {
+            profile: ArithmeticProfile::legacy(),
             x: &x,
             value,
             gradient: &gradient,
@@ -1712,6 +1761,7 @@ fn more_thuente_cauchy_first_step_matches_r_trace_prefix() {
         &upper,
         &history,
         DirectionSettings {
+            profile: ArithmeticProfile::legacy(),
             mode: DirectionMode::CauchySubspace,
             bound_activity: BoundActivity::Tolerant,
             min_step: MAIN_PATH_MIN_STEP,
@@ -1722,6 +1772,7 @@ fn more_thuente_cauchy_first_step_matches_r_trace_prefix() {
     let step = line_search_with_mode(
         &mut problem,
         LineSearchRequest {
+            profile: ArithmeticProfile::legacy(),
             x: &x,
             value,
             gradient: &gradient,
@@ -1779,6 +1830,7 @@ fn rosenbrock_default_evaluation_trace_matches_r_prefix() {
             &[-5.0, -5.0],
             &[5.0, 5.0],
             BackendControl {
+                profile: ArithmeticProfile::legacy(),
                 maxit: 100,
                 factr: 1e7,
                 pgtol: 0.0,
@@ -1863,6 +1915,7 @@ fn run_rosenbrock_backend(
             &[-5.0, -5.0],
             &[5.0, 5.0],
             BackendControl {
+                profile: ArithmeticProfile::legacy(),
                 maxit: 100,
                 factr,
                 pgtol: 0.0,
@@ -1951,4 +2004,77 @@ impl BackendProblem for AlwaysNonFiniteObjective {
     fn gradient(&mut self, _x: &[f64]) -> Result<Vec<f64>, OptimError> {
         Ok(vec![0.0])
     }
+}
+
+#[test]
+fn interpolated_brackets_enclose_independent_convex_minima() {
+    // Check geometric invariants against independently known minimizers rather
+    // than asserting the interpolation helper's own formula as its expectation.
+    let mut checked = 0;
+    for center in [0.03125_f64, 0.125, 0.75, 2.0, 19.0] {
+        for initial in [0.01_f64, 0.1, 1.0, 10.0, 100.0] {
+            for quartic in [false, true] {
+                let phi = |alpha: f64| {
+                    let d = alpha - center;
+                    MoreThuentePoint {
+                        alpha,
+                        value: if quartic {
+                            d.powi(4) + 0.01 * d * d
+                        } else {
+                            d * d
+                        },
+                        derivative: if quartic {
+                            4.0 * d.powi(3) + 0.02 * d
+                        } else {
+                            2.0 * d
+                        },
+                    }
+                };
+                let mut state = MoreThuenteStepState {
+                    best: phi(0.0),
+                    other: phi(0.0),
+                    bracketed: false,
+                };
+                let mut alpha = initial;
+                for _ in 0..20 {
+                    if phi(alpha).derivative.abs() <= 1e-12 || alpha == state.best.alpha {
+                        break;
+                    }
+                    let old_interval = state.bracketed.then(|| {
+                        (
+                            state.best.alpha.min(state.other.alpha),
+                            state.best.alpha.max(state.other.alpha),
+                        )
+                    });
+                    let next = more_thuente_step(
+                        ArithmeticProfile::legacy(),
+                        &mut state,
+                        phi(alpha),
+                        0.0,
+                        1e4,
+                    );
+                    checked += 1;
+                    assert!(next.is_finite() && (0.0..=1e4).contains(&next));
+                    if state.bracketed {
+                        let low = state.best.alpha.min(state.other.alpha);
+                        let high = state.best.alpha.max(state.other.alpha);
+                        let tolerance = 1e-12 * high.max(1.0);
+                        assert!(
+                            low <= center + tolerance && high >= center - tolerance,
+                            "minimum {center} outside [{low}, {high}]"
+                        );
+                        assert!(
+                            next >= low - tolerance && next <= high + tolerance,
+                            "trial {next} outside [{low}, {high}]"
+                        );
+                        if let Some((old_low, old_high)) = old_interval {
+                            assert!(low >= old_low - tolerance && high <= old_high + tolerance);
+                        }
+                    }
+                    alpha = next;
+                }
+            }
+        }
+    }
+    assert!(checked >= 100, "too few bracket updates: {checked}");
 }

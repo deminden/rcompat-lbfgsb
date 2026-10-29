@@ -88,6 +88,9 @@ impl Bounds {
             .zip(self.upper.iter())
             .enumerate()
         {
+            if !value.is_finite() {
+                return Err(OptimError::NonFiniteInitialParameter { index, value });
+            }
             if value < lower || value > upper {
                 return Err(OptimError::InitialParameterOutOfBounds {
                     index,

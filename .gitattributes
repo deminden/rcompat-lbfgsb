@@ -1,0 +1,2 @@
+# Unified patch data contains required space-prefixed blank context lines.
+measurements/**/*.patch -whitespace

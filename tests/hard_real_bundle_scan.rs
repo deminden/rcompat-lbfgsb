@@ -1,4 +1,5 @@
 #![allow(missing_docs)]
+mod support;
 
 use std::collections::HashMap;
 use std::env;
@@ -66,11 +67,8 @@ struct ScanFailure {
 }
 
 #[test]
+#[ignore = "requires external hard-real oracle bundle; run explicitly with --ignored"]
 fn hard_real_bundle_can_scan_ignored_reference_data() {
-    if env::var_os("LBFGSB_HARD_REAL_SCAN").is_none() {
-        return;
-    }
-
     // This opt-in scan compares against the DESeq2 wrapper's saved
     // betaForceOptim rows, not against a freshly generated direct R optim()
     // oracle. It is useful for routing diagnostics over the ignored hard-real
@@ -85,6 +83,12 @@ fn hard_real_bundle_can_scan_ignored_reference_data() {
     let par_tolerance = env_f64("LBFGSB_HARD_REAL_PAR_TOL").unwrap_or(1e-7);
     let value_tolerance = env_f64("LBFGSB_HARD_REAL_VALUE_TOL").unwrap_or(1e-6);
     let value_relative_tolerance = env_f64("LBFGSB_HARD_REAL_VALUE_REL_TOL").unwrap_or(1e-12);
+    for tolerance in [par_tolerance, value_tolerance, value_relative_tolerance] {
+        assert!(
+            tolerance.is_finite() && tolerance >= 0.0,
+            "scan tolerances must be finite and nonnegative"
+        );
+    }
     let strict = env::var_os("LBFGSB_HARD_REAL_STRICT").is_some();
     let verbose = env::var_os("LBFGSB_HARD_REAL_VERBOSE").is_some();
     let only_contrast = env::var("LBFGSB_HARD_REAL_ONLY_CONTRAST").ok();
@@ -281,7 +285,26 @@ fn hard_real_bundle_can_scan_ignored_reference_data() {
     }
 
     if strict {
-        assert_eq!(both_close, total, "hard real parity scan failures");
+        let expected = if only_contrast.is_none() && only_gene.is_none() {
+            limit
+        } else {
+            rows.iter()
+                .take(limit)
+                .filter(|row| {
+                    only_contrast.as_ref().is_none_or(|c| c == &row.contrast)
+                        && only_gene.as_ref().is_none_or(|g| g == &row.gene)
+                })
+                .count()
+        };
+        assert!(expected > 0, "strict scan selected no reference rows");
+        assert_eq!(
+            total, expected,
+            "strict scan did not execute every requested row"
+        );
+        assert_eq!(
+            both_close, total,
+            "hard-real wrapper endpoint accuracy failures"
+        );
     }
 }
 
@@ -501,11 +524,7 @@ fn projected_gradient_norm(x: &[f64], gradient: &[f64], lower: &[f64], upper: &[
 }
 
 fn max_abs_delta(left: &[f64], right: &[f64]) -> f64 {
-    assert_eq!(left.len(), right.len());
-    left.iter()
-        .zip(right.iter())
-        .map(|(&left, &right)| (left - right).abs())
-        .fold(0.0, f64::max)
+    support::parameter_error(left, right)
 }
 
 fn parse_f64(value: &str) -> f64 {

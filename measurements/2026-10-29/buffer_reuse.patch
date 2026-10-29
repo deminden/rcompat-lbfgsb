@@ -1,0 +1,67 @@
+--- a/src/backend/native/compact.rs
++++ b/src/backend/native/compact.rs
+@@ -561,13 +561,6 @@
+         }
+ 
+         let dtd = self.profile.short_dot(direction, direction);
+-        let mut stored_step = direction.to_vec();
+-        if alpha != 1.0 {
+-            for value in &mut stored_step {
+-                *value *= alpha;
+-            }
+-        }
+-
+         self.iupdat += 1;
+         if self.iupdat <= self.memory {
+             self.col = self.iupdat;
+@@ -577,7 +570,12 @@
+             self.head = (self.head + 1) % self.memory;
+         }
+ 
+-        self.ws[self.itail].copy_from_slice(&stored_step);
++        self.ws[self.itail].copy_from_slice(direction);
++        if alpha != 1.0 {
++            for value in &mut self.ws[self.itail] {
++                *value *= alpha;
++            }
++        }
+         self.wy[self.itail].copy_from_slice(gradient_difference);
+         self.theta = rr / dr;
+ 
+@@ -594,10 +592,12 @@
+ 
+         let mut pointer = self.head;
+         for previous in 0..self.col - 1 {
+-            self.sy[self.col - 1][previous] =
+-                self.profile.short_dot(&stored_step, &self.wy[pointer]);
+-            self.ss[previous][self.col - 1] =
+-                self.profile.short_dot(&self.ws[pointer], &stored_step);
++            self.sy[self.col - 1][previous] = self
++                .profile
++                .short_dot(&self.ws[self.itail], &self.wy[pointer]);
++            self.ss[previous][self.col - 1] = self
++                .profile
++                .short_dot(&self.ws[pointer], &self.ws[self.itail]);
+             pointer = (pointer + 1) % self.memory;
+         }
+         self.ss[self.col - 1][self.col - 1] = if alpha == 1.0 {
+@@ -1143,14 +1143,17 @@
+         if coherent_cholesky_upper_in_place(self.profile, &mut self.wn, 0, col).is_none() {
+             return false;
+         }
++        let mut rhs = vec![0.0; col];
+         for column in col..2 * col {
+-            let mut rhs: Vec<f64> = (0..col).map(|row| self.wn[row][column]).collect();
++            for (row, value) in rhs.iter_mut().enumerate() {
++                *value = self.wn[row][column];
++            }
+             if coherent_solve_upper_transpose_in_place(self.profile, &self.wn, 0, col, &mut rhs)
+                 .is_none()
+             {
+                 return false;
+             }
+-            for (row, value) in rhs.into_iter().enumerate() {
++            for (row, &value) in rhs.iter().enumerate() {
+                 self.wn[row][column] = value;
+             }
+         }

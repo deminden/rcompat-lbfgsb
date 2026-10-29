@@ -1,0 +1,32 @@
+{
+  "date": "2026-10-29",
+  "cpu": "Apple Silicon",
+  "system": "macOS-27.2-arm64-arm-64bit",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1",
+  "base_commit": "88ed7687df496114b0e0197db393175a4063c76b",
+  "state": "YY cache rounding calibration applied consistently to all three performance phases; other optimizations isolated by reverse patches",
+  "compact_before_sha256": "0be013168105514e8b9a961cc7e80c93b4b3404ee1a5eba9ca4089b940da88ce",
+  "compact_after_sha256": "c99b28af0651ee7bc831c7ebabf9b9820d5c9f7977fe9b24bf6d7ed9523d6338",
+  "inputs": "fixed dyadic diagonal quadratic; maxit=24, factr=0, pgtol=0; dimensions 32/128/512/2048, histories 1/5/10/20",
+  "samples": 5,
+  "warmup": 1,
+  "commands": {
+    "portable": "LBFGSB_BENCH_SAMPLES=5 cargo bench --offline --bench allocation_growth",
+    "native": "RUSTFLAGS='-C target-cpu=native' CARGO_TARGET_DIR=target/native LBFGSB_BENCH_SAMPLES=5 cargo bench --offline --bench allocation_growth",
+    "before": "In an isolated copy, reverse callback_allocation.patch and buffer_reuse.patch, then run the portable command."
+  },
+  "instrumentation": "stats_alloc 0.1.10 (development dependency only), System allocator; cumulative requests, not peak live memory",
+  "files": {
+    "benches/allocation_growth.rs": "1543a86ded3608b0acfb9d5e220f5b032e4e1334fa76aea5ac12dfee34a67584",
+    "measurements/2026-10-29/Cargo.measured.toml": "a30c0130cc8126c03cb1251d2cd8328544787d3f4ff65b93dc0fcd6059376ccf",
+    "measurements/2026-10-29/buffer_reuse.patch": "9b4df818d8b64962deb00260907a2c63900c492a9288f0eca6d683197e88a60e",
+    "measurements/2026-10-29/allocation_after.csv": "0f275ec0f9de6e1575661c97ba0547b11522a8b320672e3f8445c8db1d30b7c9",
+    "measurements/2026-10-29/allocation_before.csv": "901ba9e4101ce07e953cda51afff3ec706eec7549b50cc320d3106ca742d84aa",
+    "measurements/2026-10-29/allocation_native.csv": "016b542cba91f0075e49d022905ef5375184a4255eb568ad00ad8f2319d9c8c1",
+    "measurements/2026-10-29/allocation_owned.csv": "9a804adb97208ba12190a73c5e373430ffd298ab5af2c115642a8c1f33a8d686"
+  },
+  "manifest_snapshot": "Measured 0.2.2 build inputs, with the obsolete local-artifact exclusion removed during repository cleanup. The current package is 0.3.0; numerical/development inputs are unchanged.",
+  "later_gradient_reuse": "allocation_owned.csv records the later owned-gradient conversion; all 224 complete-result fingerprints and evaluation counts match the earlier phases.",
+  "later_gradient_reuse_samples": 5,
+  "later_gradient_reuse_command": "LBFGSB_BENCH_SAMPLES=5 cargo bench --offline --bench allocation_growth"
+}

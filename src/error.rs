@@ -68,6 +68,15 @@ pub enum OptimError {
         /// Human-readable reason.
         reason: String,
     },
+    /// Arithmetic produced a non-finite value while transforming or evaluating a problem.
+    NumericalFailure {
+        /// Transformation or numerical operation that failed.
+        operation: &'static str,
+        /// Coordinate involved, when applicable.
+        index: Option<usize>,
+        /// Non-finite result of the operation.
+        value: f64,
+    },
     /// The internal optimizer backend failed.
     BackendFailure {
         /// Backend failure message.
@@ -130,9 +139,28 @@ impl fmt::Display for OptimError {
                 ),
                 None => write!(f, "invalid gradient: {reason}"),
             },
+            Self::NumericalFailure { operation, index, value } => {
+                write!(f, "non-finite result during {operation} at coordinate {index:?}: {value}")
+            }
             Self::BackendFailure { message } => write!(f, "backend failure: {message}"),
         }
     }
 }
 
 impl Error for OptimError {}
+
+pub(crate) fn checked_finite(
+    value: f64,
+    operation: &'static str,
+    index: Option<usize>,
+) -> Result<f64, OptimError> {
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(OptimError::NumericalFailure {
+            operation,
+            index,
+            value,
+        })
+    }
+}
