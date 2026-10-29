@@ -1,4 +1,4 @@
-use crate::error::{checked_finite, OptimError};
+use crate::error::{OptimError, checked_finite};
 
 pub(crate) fn finite_difference_gradient<F>(
     x: &[f64],

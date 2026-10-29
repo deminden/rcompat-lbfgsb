@@ -1,6 +1,8 @@
 //! Fixed-budget allocation and scaling probe. No workload runs under cargo test.
+#[path = "support/fingerprint.rs"]
+mod fingerprint;
 use rcompat_lbfgsb::*;
-use stats_alloc::{Region, StatsAlloc, INSTRUMENTED_SYSTEM};
+use stats_alloc::{INSTRUMENTED_SYSTEM, Region, StatsAlloc};
 use std::alloc::System;
 use std::cell::Cell;
 use std::time::Instant;
@@ -22,24 +24,15 @@ struct Evidence {
 
 impl Evidence {
     fn result_fingerprint(&self) -> u64 {
-        let mut hash = 0xcbf29ce484222325_u64;
-        let mut add = |byte: u8| {
-            hash = (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3);
-        };
-        for value in self.result.0.iter().copied().chain([
-            self.result.1,
-            self.result.2.function as u64,
-            self.result.2.gradient as u64,
-            self.result.3 as u64,
-        ]) {
-            for byte in value.to_le_bytes() {
-                add(byte);
-            }
-        }
-        for byte in self.result.4.bytes() {
-            add(byte);
-        }
-        hash
+        fingerprint::result_fingerprint(
+            self.result.0.iter().copied().chain([
+                self.result.1,
+                self.result.2.function as u64,
+                self.result.2.gradient as u64,
+                self.result.3 as u64,
+            ]),
+            &self.result.4,
+        )
     }
 }
 
@@ -158,7 +151,9 @@ fn main() {
         .parse()
         .unwrap();
     assert!(samples > 0);
-    println!("dimension,lmm,route,callback_work,profile,elapsed_ns,objective_ns,gradient_ns,allocations,bytes_allocated,reallocations,callback_allocations,callback_bytes,raw_objective_calls,raw_gradient_calls,optimizer_function_calls,optimizer_gradient_calls,convergence,result_fingerprint");
+    println!(
+        "dimension,lmm,route,callback_work,profile,elapsed_ns,objective_ns,gradient_ns,allocations,bytes_allocated,reallocations,callback_allocations,callback_bytes,raw_objective_calls,raw_gradient_calls,optimizer_function_calls,optimizer_gradient_calls,convergence,result_fingerprint"
+    );
     for n in dimensions {
         assert!(n > 0);
         for m in [1, 5, 10, 20] {
@@ -169,7 +164,10 @@ fn main() {
                     continue;
                 }
                 for work in [1, 16] {
-                    for profile in [ArithmeticProfile::R461X86, ArithmeticProfile::R461MacArm] {
+                    for profile in [
+                        ArithmeticProfile::X86OpenBlas,
+                        ArithmeticProfile::AppleSiliconOpenBlas,
+                    ] {
                         let (expected, ..) = measure(n, m, route, work, profile);
                         let mut times = Vec::with_capacity(samples);
                         for _ in 0..samples {
@@ -182,7 +180,21 @@ fn main() {
                         }
                         times.sort_unstable();
                         let (elapsed, f, g) = times[samples / 2];
-                        println!("{n},{m},{route},{work},{},{elapsed},{f},{g},{},{},{},{},{},{},{},{},{},{},{:016x}",profile.id(),expected.allocations,expected.bytes,expected.reallocations,expected.callback_allocations,expected.callback_bytes,expected.raw_f,expected.raw_g,expected.result.2.function,expected.result.2.gradient,expected.result.3,expected.result_fingerprint());
+                        println!(
+                            "{n},{m},{route},{work},{},{elapsed},{f},{g},{},{},{},{},{},{},{},{},{},{},{:016x}",
+                            profile.id(),
+                            expected.allocations,
+                            expected.bytes,
+                            expected.reallocations,
+                            expected.callback_allocations,
+                            expected.callback_bytes,
+                            expected.raw_f,
+                            expected.raw_g,
+                            expected.result.2.function,
+                            expected.result.2.gradient,
+                            expected.result.3,
+                            expected.result_fingerprint()
+                        );
                     }
                 }
             }

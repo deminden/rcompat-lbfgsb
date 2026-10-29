@@ -1,5 +1,5 @@
 use crate::bounds::Bounds;
-use crate::error::{checked_finite, OptimError};
+use crate::error::{OptimError, checked_finite};
 
 #[derive(Debug, Clone)]
 pub(crate) struct Scaling {

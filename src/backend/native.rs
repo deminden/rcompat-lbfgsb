@@ -10,10 +10,10 @@ mod iteration;
 mod line_search;
 use line_search::*;
 #[cfg(test)]
-mod legacy;
+mod reference;
 use crate::profile::ArithmeticProfile;
 #[cfg(test)]
-use legacy::*;
+use reference::*;
 
 const BOUND_TOL: f64 = 1e-12;
 const MAIN_PATH_MIN_STEP: f64 = 1e-16;
@@ -48,18 +48,6 @@ fn exact_bound_count(x: &[f64], lower: &[f64], upper: &[f64]) -> usize {
         .count()
 }
 
-#[cfg(test)]
-fn tolerant_bound_count(x: &[f64], lower: &[f64], upper: &[f64], tolerance: f64) -> usize {
-    x.iter()
-        .zip(lower.iter())
-        .zip(upper.iter())
-        .filter(|&((&value, &lower), &upper)| {
-            (lower.is_finite() && (value - lower).abs() <= tolerance)
-                || (upper.is_finite() && (upper - value).abs() <= tolerance)
-        })
-        .count()
-}
-
 #[derive(Debug, Clone)]
 struct Evaluation {
     value: f64,
@@ -70,7 +58,6 @@ struct Evaluation {
 struct DirectionChoice {
     direction: Vec<f64>,
     unit_step_target: Option<Vec<f64>>,
-    refresh_history: bool,
 }
 
 fn evaluate<P>(
@@ -238,5 +225,4 @@ fn maybe_trace(
 }
 
 #[cfg(test)]
-#[path = "native_tests.rs"]
 mod tests;

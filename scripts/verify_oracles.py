@@ -4,22 +4,84 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+from integrity import require, sha256_file
 
 ROOT = Path(__file__).resolve().parent.parent
-CONFIGS = {'mixed_bounds': {'cases': 37, 'recipe': 'scripts/generate_mixed_bound_fixtures.R', 'payload_sha256': '052c5bdeae0bd6ec1a18d96a55337c3ea23cd4daeae804408003b1b9e43e70c5', 'field': 'cases', 'id': 'id', 'r_version': '4.6.1', 'platform': 'aarch64-apple-darwin20.0.0'}, 'line_search': {'cases': 6, 'recipe': 'scripts/generate_line_search_fixtures.R', 'payload_sha256': 'a46c9cd154d6aa49f5610bfad8b186b31e73eb7e989f405eadeee357e5226a7e', 'field': 'cases', 'id': 'id', 'r_version': '4.6.1', 'platform': 'aarch64-apple-darwin20.0.0'}, 'synthetic_v1': {'path': 'fixtures/synthetic_v1/cases.json', 'cases': 512, 'recipe': 'scripts/generate_stress_fixtures.R', 'payload_sha256': '2f0f7495326be3e871887ebf168f3718c15caf340ccf83b87869f02b2bba4fd8', 'field': 'cases', 'id': 'id', 'r_version': '4.6.2', 'platform': 'aarch64-apple-darwin27.2.0', 'serializer': 'scripts/oracle_json.R', 'native': True}, 'native_r462_hard': {'path': 'fixtures/native_r462/hard_real_reference.json', 'cases': 48, 'recipe': 'scripts/baseline_deseq2_r461.R', 'payload_sha256': '0d5752dc76241ac6aaf84328da44d77f79a4ccdcf442ead013e52b3bdb41e497', 'field': 'results', 'id': 'fixture', 'r_version': '4.6.2', 'platform': 'aarch64-apple-darwin27.2.0', 'serializer': 'scripts/oracle_json.R', 'native': True, 'input': 'fixtures/deseq_hard_real_subset/optim_cases.json'}, 'native_r462_airway': {'path': 'fixtures/native_r462/airway_reference.json', 'cases': 28, 'recipe': 'scripts/baseline_deseq2_r461.R', 'payload_sha256': 'ff8152e773975a3d2c1258ab058a3c83b8dba42cd4adaf38c53fa5a10024ca36', 'field': 'results', 'id': 'fixture', 'r_version': '4.6.2', 'platform': 'aarch64-apple-darwin27.2.0', 'serializer': 'scripts/oracle_json.R', 'native': True, 'input': 'fixtures/deseq_airway/cases.json'}}
-CONFIGS["active_set_trace"] = {
-    "path": "fixtures/active_set/case_trace.json", "cases": 64,
-    "recipe": "scripts/extract_active_set_trace.py",
-    "payload_sha256": "25f2b5eff34114ab65f264105a3d5263878c215d29f97d7123aa16c223792fa7",
-    "field": "base_calls", "id": "ordinal", "r_version": "4.6.2",
-    "platform": "aarch64-apple-darwin27.2.0", "native": True,
-    "input": "fixtures/synthetic_v1/cases.json", "top_result": True, "exact_trace": True,
-}
-
-
-def require(condition, message):
-    if not condition:
-        raise ValueError(message)
+CONFIGS = {'mixed_bounds': {'r_version': '4.6.2',
+                  'platform': 'aarch64-apple-darwin27.2.0',
+                  'cases': 37,
+                  'recipe': 'scripts/generate_mixed_bound_fixtures.R',
+                  'field': 'cases',
+                  'id': 'id',
+                  'payload_sha256': '2935825e11a4b93ce452408ca92232df3e47372c93fd3b9c2f8b341f47a42816'},
+ 'line_search': {'r_version': '4.6.2',
+                 'platform': 'aarch64-apple-darwin27.2.0',
+                 'cases': 6,
+                 'recipe': 'scripts/generate_line_search_fixtures.R',
+                 'field': 'cases',
+                 'id': 'id',
+                 'payload_sha256': '2a9463f2277445a6ec4aac3e5286a738b8dfccc8dd3e5e035bb797e5c88ad87c'},
+ 'synthetic_v1': {'r_version': '4.6.2',
+                  'platform': 'aarch64-apple-darwin27.2.0',
+                  'cases': 512,
+                  'recipe': 'scripts/generate_stress_fixtures.R',
+                  'field': 'cases',
+                  'id': 'id',
+                  'serializer': 'scripts/oracle_json.R',
+                  'native': True,
+                  'payload_sha256': 'bea70a22de3640c103e14ad3f840a197fc5169e0a3498f2dfdc3aa33945fe273'},
+ 'real_glm': {'r_version': '4.6.2',
+              'platform': 'aarch64-apple-darwin27.2.0',
+              'path': 'fixtures/deseq_real_subset/optim_cases.json',
+              'cases': 68,
+              'recipe': 'scripts/regenerate_scientific_fixtures.R',
+              'field': 'cases',
+              'id': 'fixture',
+              'payload_sha256': '9aac1fb9e0cd59292934d64cf8ce35a41f2e0b4f06666341b4603d3e420ebe88'},
+ 'hard_glm': {'r_version': '4.6.2',
+              'platform': 'aarch64-apple-darwin27.2.0',
+              'path': 'fixtures/deseq_hard_real_subset/optim_cases.json',
+              'cases': 48,
+              'recipe': 'scripts/regenerate_scientific_fixtures.R',
+              'field': 'contrasts',
+              'nested': 'cases',
+              'id': 'fixture',
+              'payload_sha256': '3a8e5eb3ecef8e9e0bd3316a04a4691534e28a17c3fcb0758efb659f78b0368c'},
+ 'native_r462_hard': {'r_version': '4.6.2',
+                      'platform': 'aarch64-apple-darwin27.2.0',
+                      'path': 'fixtures/native_r462/hard_real_reference.json',
+                      'cases': 48,
+                      'recipe': 'scripts/capture_deseq2_reference.R',
+                      'field': 'results',
+                      'id': 'fixture',
+                      'serializer': 'scripts/oracle_json.R',
+                      'native': True,
+                      'input': 'fixtures/deseq_hard_real_subset/optim_cases.json',
+                      'payload_sha256': '7caba7aa185ae21bdc03aaaff7a37f02189880a0a276d4a5f359f33246b1d5f0'},
+ 'native_r462_airway': {'r_version': '4.6.2',
+                        'platform': 'aarch64-apple-darwin27.2.0',
+                        'path': 'fixtures/native_r462/airway_reference.json',
+                        'cases': 28,
+                        'recipe': 'scripts/capture_deseq2_reference.R',
+                        'field': 'results',
+                        'id': 'fixture',
+                        'serializer': 'scripts/oracle_json.R',
+                        'native': True,
+                        'input': 'fixtures/deseq_airway/cases.json',
+                        'input_recipe': 'scripts/generate_airway_fixtures.R',
+                        'payload_sha256': '313950bc5ef80bfe73cef04a0878405462ad00db67a6abb1176dd4687f6b8b14'},
+ 'active_set_trace': {'r_version': '4.6.2',
+                      'platform': 'aarch64-apple-darwin27.2.0',
+                      'path': 'fixtures/active_set/case_trace.json',
+                      'cases': 64,
+                      'recipe': 'scripts/extract_active_set_trace.py',
+                      'field': 'base_calls',
+                      'id': 'ordinal',
+                      'native': True,
+                      'input': 'fixtures/synthetic_v1/cases.json',
+                      'top_result': True,
+                      'exact_trace': True,
+                      'payload_sha256': '0cb8d06d9319fe47c8df417d44e9dbdbca96e14991bb02887dea8e2e13687f85'}}
 
 
 def verify(name, path=None):
@@ -30,9 +92,11 @@ def verify(name, path=None):
             f"{name}: frozen oracle payload changed; review and regenerate its fingerprint")
     fixture = json.loads(payload)
     require(fixture["generator"] == config["recipe"], f"{name}: unexpected recipe")
-    recipe_hash = hashlib.sha256((ROOT / config["recipe"]).read_bytes()).hexdigest()
+    recipe_hash = sha256_file(ROOT / config["recipe"])
     require(fixture["generator_sha256"] == recipe_hash, f"{name}: recipe changed without oracle regeneration")
     rows=fixture[config["field"]]
+    if config.get("nested"):
+        rows = [case for group in rows for case in group[config["nested"]]]
     require(len(rows) == config["cases"], f"{name}: incomplete corpus")
     require(len({case[config["id"]] for case in rows}) == config["cases"], f"{name}: duplicate case")
     require(fixture["threads"] == "1", f"{name}: expected one BLAS thread")
@@ -40,11 +104,16 @@ def verify(name, path=None):
     require(config["r_version"] in fixture["r_version"], f"{name}: unexpected R version")
     require(fixture["blas"] and fixture["session"], f"{name}: incomplete environment fingerprint")
     if config.get("serializer"):
-        digest=hashlib.sha256((ROOT/config["serializer"]).read_bytes()).hexdigest()
+        digest=sha256_file(ROOT/config["serializer"])
         require(fixture["serializer_sha256"]==digest,f"{name}: serializer changed without regeneration")
     if config.get("input"):
-        digest=hashlib.sha256((ROOT/config["input"]).read_bytes()).hexdigest()
+        digest=sha256_file(ROOT/config["input"])
         require(fixture["input_sha256"]==digest,f"{name}: source inputs changed without regeneration")
+    if config.get("input_recipe"):
+        inputs = json.loads((ROOT / config["input"]).read_text())
+        require(inputs["generator"] == config["input_recipe"], f"{name}: unexpected input recipe")
+        require(inputs["generator_sha256"] == sha256_file(ROOT / config["input_recipe"]),
+                f"{name}: input recipe changed without regeneration")
     if config.get("native"):
         for key in ["CFLAGS","CXXFLAGS","FFLAGS"]:
             require("-mcpu=native" in fixture["build_config"][key],f"{name}: native compilation fingerprint missing")
@@ -53,16 +122,15 @@ def verify(name, path=None):
         require(fixture["raw_calls"] == 1472 and len(fixture["raw_callback_fnv1a64"]) == 16, "active-set raw trace contract changed")
         int(fixture["raw_callback_fnv1a64"], 16)
         for source, expected in fixture["capture"]["sources"].items():
-            require(hashlib.sha256((ROOT / source).read_bytes()).hexdigest() == expected, f"active-set capture source changed: {source}")
+            require(sha256_file(ROOT / source) == expected, f"active-set capture source changed: {source}")
         require(fixture["capture"]["fixture_sha256"] == fixture["input_sha256"], "active-set source inputs disagree")
     return config["cases"]
 
 
-ENVIRONMENT_SHA256 = "3c5556074e9cb45cd3e1502261411e3d4c2307445f1dba4cde671f706aa3dd20"
+ENVIRONMENT_SHA256 = "3595d4321826623da76b45c0e22d36029f1804f6d22e8a4f1defe925c07f61da"
 BLAS_ENVIRONMENT_SHA256 = "f4b64c9f7920df6248236056aad9e455c8944131508fc0083677444e0e424555"
 RUNTIME_SNAPSHOTS = {
-    "r461-macos-arm.json": "0d3c8be44bf6dc66ba3e2eb77854d4e05533e860dd94cee39160461cc2f30c20",
-    "r462-macos-arm-native.json": "af622ce8207ed3bc61a33e68c5218b7f9c5a586daad0cc7fedb3629e3acd1d8d",
+    "r462-macos-arm-native.json": "b10117fb27d5ee4f8155068d742bb350a5ba946321598bc81f5ceaa1217a8966",
 }
 
 
@@ -73,7 +141,7 @@ def verify_runtime_snapshots(directory=None):
         require(hashlib.sha256(payload).hexdigest() == expected, f"runtime snapshot changed: {name}")
         snapshot = json.loads(payload)
         recipe = ROOT / snapshot["generator"]
-        require(hashlib.sha256(recipe.read_bytes()).hexdigest() == snapshot["generator_sha256"],
+        require(sha256_file(recipe) == snapshot["generator_sha256"],
                 f"runtime capture recipe changed: {name}")
         require(snapshot["cpu"] == "Apple Silicon", f"unexpected runtime CPU: {name}")
         require(snapshot["threads"] == {"OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1"},
@@ -81,7 +149,25 @@ def verify_runtime_snapshots(directory=None):
         require(snapshot["runtime"]["packages"]["DESeq2"]["version"] == "1.52.0",
                 f"unexpected runtime DESeq2: {name}")
         require(len(snapshot["binary_sha256"]) >= 9, f"incomplete runtime binary hashes: {name}")
-        require(len(snapshot["bootstrap_distribution"]) >= 98, f"incomplete runtime distribution: {name}")
+        require("4.6.2" in snapshot["runtime"]["r_version"], f"unexpected runtime R version: {name}")
+
+
+STANDARD_MANIFEST_SHA256 = "01cda2ddbc7b822ba42d119d4bdf2c62a6a6dc7ebfb23e827f996db5473a558b"
+
+
+def verify_standard_oracles(directory=None):
+    directory = Path(directory) if directory else ROOT / "fixtures/r_optim_lbfgsb"
+    payload = (directory / "manifest.json").read_bytes()
+    require(hashlib.sha256(payload).hexdigest() == STANDARD_MANIFEST_SHA256, "standard fixture manifest changed")
+    manifest = json.loads(payload)
+    require("4.6.2" in manifest["r_version"], "unexpected standard R version")
+    require(len(manifest["payloads"]) == 63, "incomplete standard fixtures")
+    for name, expected in manifest["payloads"].items():
+        require(hashlib.sha256((directory / name).read_bytes()).hexdigest() == expected, f"standard fixture payload changed: {name}")
+        fixture = json.loads((directory / name).read_bytes())
+        require("4.6.2" in fixture["r_version"], f"unexpected standard fixture R version: {name}")
+    for name, expected in manifest["sources"].items():
+        require(sha256_file(ROOT / name) == expected, f"standard fixture recipe changed: {name}")
 
 
 def verify_blas_oracle(directory=None):
@@ -96,7 +182,7 @@ def verify_blas_oracle(directory=None):
     require(config["library_config"] == "OpenBLAS 0.3.34 NO_AFFINITY USE_OPENMP VORTEX MAX_THREADS=128",
             "unexpected BLAS arithmetic environment")
     for key in ["generator", "source"]:
-        require(hashlib.sha256((ROOT / config[key]).read_bytes()).hexdigest() == config[key + "_sha256"],
+        require(sha256_file(ROOT / config[key]) == config[key + "_sha256"],
                 f"BLAS {key} changed without regeneration")
     lines = payload.decode("ascii").splitlines()
     require(lines[0] == "length,seed,result_bits" and len(lines) == 201, "BLAS corpus is incomplete")
@@ -112,24 +198,27 @@ def verify_reference_environment():
     require(environment["cpu"]=="Apple Silicon","unexpected native reference CPU")
     for key in ["CFLAGS","CXXFLAGS","FFLAGS"]:
         require("-mcpu=native" in environment["build_config"][key],f"native reference {key} missing")
-    for name,digest in environment["recipes"].items():
-        require(hashlib.sha256((ROOT/name).read_bytes()).hexdigest()==digest,f"native build recipe changed: {name}")
+    require(environment["source_sha256"] == "c297040f6392b1dac6e5c0eb398422cfdaedf540ae2205edb9ad0d10cb10ee00",
+            "native R source archive fingerprint changed")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--corpus", choices=list(CONFIGS))
     parser.add_argument("--fixture", type=Path, help="alternative payload to check against the frozen fingerprint")
+    parser.add_argument("--standard-directory", type=Path, help="alternative standard fixture directory to verify")
     parser.add_argument("--blas-directory", type=Path, help="alternative DDOT corpus directory to verify")
     parser.add_argument("--runtime-directory", type=Path, help="alternative installed-oracle snapshot directory to verify")
     args = parser.parse_args()
     if args.fixture and not args.corpus:
         parser.error("--fixture requires --corpus")
     try:
+        verify_standard_oracles(args.standard_directory)
+        print("standard fixtures: 63 current-R payloads and split recipes verified")
         verify_reference_environment()
         verify_runtime_snapshots(args.runtime_directory)
         verify_blas_oracle(args.blas_directory)
-        print("runtime snapshots: R 4.6.1 / native 4.6.2 binaries, distribution archives and capture recipe verified")
+        print("runtime snapshots: R 4.6.2 binaries and package versions and capture recipe verified")
         print("arithmetic: 200 public DDOT calls; payload, recipes and reference environment verified")
         for name in [args.corpus] if args.corpus else CONFIGS:
             count = verify(name, args.fixture)

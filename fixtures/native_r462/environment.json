@@ -41,16 +41,10 @@
   "source_sha256": "c297040f6392b1dac6e5c0eb398422cfdaedf540ae2205edb9ad0d10cb10ee00",
   "source_boundary": "Source compiled externally; no R/GPL optimizer implementation was read or used as an implementation input.",
   "openblas_threads": "1",
-  "bootstrap": "Independent conda --copy clone of deseq2-r461, plus liblzma-devel and pkg-config; runtime r-base rebuilt from source. Conda bootstrap metadata is not the authoritative R runtime version.",
   "smoke_test": {
     "genes": 16,
     "optimizer_fallback_calls": 16,
     "all_coefficients_finite": true
-  },
-  "recipes": {
-    "scripts/build_reference_r462_native.sh": "e1a2f82e3521d023aadbc91459c0ab0dba9e6e9eaad6a5ff609128f4d0454fc0",
-    "scripts/repair_reference_links.py": "a69d9c337cd43ad1fb1e5ad94d4ad735ca4543c2891b284c88cc9f53190ddda3",
-    "scripts/install_reference_deseq2_native.R": "163ac5cde41a9ce102aae45d04c1a23f38fc70c57c9c711cc41a929e8bbcbccc"
   },
   "compilers": {
     "arm64-apple-darwin20.0.0-clang": "clang version 23.1.3",

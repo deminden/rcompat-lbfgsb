@@ -4,34 +4,34 @@
 /// guarantee parity for arbitrary user callback implementations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ArithmeticProfile {
-    /// R 4.6.1 x86 / single-threaded OpenBLAS 0.3.32 reference arithmetic.
-    R461X86,
-    /// R 4.6.1 macOS ARM / OpenBLAS 0.3.34 Vortex reference arithmetic.
-    R461MacArm,
+    /// Measured x86 / single-threaded OpenBLAS 0.3.32 reference arithmetic.
+    X86OpenBlas,
+    /// Measured Apple Silicon / OpenBLAS 0.3.34 Vortex reference arithmetic.
+    AppleSiliconOpenBlas,
 }
 
 impl ArithmeticProfile {
     /// Profile used by the original entry points, including the legacy feature.
     pub const fn legacy() -> Self {
         if cfg!(feature = "arm-fma") {
-            Self::R461MacArm
+            Self::AppleSiliconOpenBlas
         } else {
-            Self::R461X86
+            Self::X86OpenBlas
         }
     }
 
     /// Stable reference identifier for recording experiment configuration.
     pub const fn id(self) -> &'static str {
         match self {
-            Self::R461X86 => "r461-x86-openblas-0.3.32",
-            Self::R461MacArm => "r461-macos-arm-openblas-0.3.34",
+            Self::X86OpenBlas => "x86-openblas-0.3.32",
+            Self::AppleSiliconOpenBlas => "apple-silicon-openblas-0.3.34",
         }
     }
 
     pub(crate) fn mul_add(self, a: f64, b: f64, c: f64) -> f64 {
         match self {
-            Self::R461X86 => a * b + c,
-            Self::R461MacArm => a.mul_add(b, c),
+            Self::X86OpenBlas => a * b + c,
+            Self::AppleSiliconOpenBlas => a.mul_add(b, c),
         }
     }
 
@@ -41,7 +41,7 @@ impl ArithmeticProfile {
         mut pair: impl FnMut(usize) -> (f64, f64),
     ) -> f64 {
         match self {
-            Self::R461X86 => {
+            Self::X86OpenBlas => {
                 let plain_end = length - length % 4;
                 let mut sum = 0.0;
                 for index in 0..plain_end {
@@ -54,7 +54,7 @@ impl ArithmeticProfile {
                 }
                 sum
             }
-            Self::R461MacArm => {
+            Self::AppleSiliconOpenBlas => {
                 // Public OpenBLAS probes show a 32-element block kernel:
                 // sixteen fused lanes, reduced as paired vector additions.
                 // Lengths below a full block retain sequential fused rounding.
@@ -105,16 +105,16 @@ mod tests {
     fn profiles_follow_independently_known_binary64_rounding() {
         let a = 1.0 + 2.0_f64.powi(-27);
         let b = 1.0 - 2.0_f64.powi(-27);
-        assert_eq!(ArithmeticProfile::R461X86.mul_add(a, b, -1.0), 0.0);
+        assert_eq!(ArithmeticProfile::X86OpenBlas.mul_add(a, b, -1.0), 0.0);
         assert_eq!(
-            ArithmeticProfile::R461MacArm.mul_add(a, b, -1.0),
+            ArithmeticProfile::AppleSiliconOpenBlas.mul_add(a, b, -1.0),
             -2.0_f64.powi(-54)
         );
         let left = [-1.0, a, 0.0, 0.0];
         let right = [1.0, b, 0.0, 0.0];
-        assert_eq!(ArithmeticProfile::R461X86.short_dot(&left, &right), 0.0);
+        assert_eq!(ArithmeticProfile::X86OpenBlas.short_dot(&left, &right), 0.0);
         assert_eq!(
-            ArithmeticProfile::R461MacArm.short_dot(&left, &right),
+            ArithmeticProfile::AppleSiliconOpenBlas.short_dot(&left, &right),
             -2.0_f64.powi(-54)
         );
     }
@@ -147,9 +147,9 @@ mod reference_dot_tests {
                 x.push(sample(&mut state));
                 y.push(sample(&mut state));
             }
-            let contiguous = ArithmeticProfile::R461MacArm.short_dot(&x, &y);
+            let contiguous = ArithmeticProfile::AppleSiliconOpenBlas.short_dot(&x, &y);
             let mut visited = 0;
-            let indexed = ArithmeticProfile::R461MacArm.indexed_dot(n, |i| {
+            let indexed = ArithmeticProfile::AppleSiliconOpenBlas.indexed_dot(n, |i| {
                 assert_eq!(i, visited);
                 visited += 1;
                 (x[i], y[i])

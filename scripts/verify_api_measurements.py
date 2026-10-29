@@ -2,15 +2,15 @@
 """Verify private callback prototypes, initial-stop allocation savings and coverage."""
 import argparse
 import csv
-import hashlib
 from itertools import product
 import json
 from pathlib import Path
+from integrity import verify_hashes
 import re
 
 ROOT = Path(__file__).resolve().parent.parent
 DIRECTORY = ROOT / "measurements/2026-10-29"
-PROFILES = ["r461-x86-openblas-0.3.32", "r461-macos-arm-openblas-0.3.34"]
+PROFILES = ["x86-openblas-0.3.32", "apple-silicon-openblas-0.3.34"]
 IDENTITY = ["dimension", "lmm", "profile", "callback_work", "stationary", "mode"]
 
 
@@ -57,10 +57,8 @@ def verify(before, after):
 
 def verify_fingerprints():
     metadata = json.loads((DIRECTORY / "api_environment.json").read_text())
-    for name, digest in metadata["files"].items():
-        assert hashlib.sha256((ROOT / name).read_bytes()).hexdigest() == digest, f"API measurement input/evidence changed: {name}"
-    for name, digest in metadata["production_after"].items():
-        assert hashlib.sha256((ROOT / name).read_bytes()).hexdigest() == digest, f"API prototype production source changed: {name}; rerun measurements"
+    verify_hashes(ROOT, metadata["files"], "API measurement input/evidence changed")
+    verify_hashes(ROOT, metadata["production_after"], "API production source changed; rerun measurements")
     for phase in ["before", "after"]:
         portable, native = load(DIRECTORY / f"api_options_{phase}.csv", phase == "after"), load(DIRECTORY / f"api_options_native_{phase}.csv", phase == "after")
         for key, row in portable.items():

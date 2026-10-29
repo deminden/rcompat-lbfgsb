@@ -4,20 +4,13 @@ mod support;
 use rcompat_lbfgsb::*;
 use serde_json::Value;
 
-fn numbers(v: &Value) -> Vec<f64> {
-    v.as_array()
-        .unwrap()
-        .iter()
-        .map(|x| x.as_f64().unwrap())
-        .collect()
-}
-
 #[test]
 fn search_outcomes_and_every_trial_match_r() {
     let fixture: Value =
         serde_json::from_str(include_str!("../fixtures/line_search/cases.json")).unwrap();
     assert_eq!(fixture["cases"].as_array().unwrap().len(), 6);
-    assert_eq!(fixture["platform"], "aarch64-apple-darwin20.0.0");
+    assert_eq!(fixture["platform"], "aarch64-apple-darwin27.2.0");
+    let mut differences = support::MaxAbsoluteDifferences::default();
     let mut failures = Vec::new();
     for case in fixture["cases"].as_array().unwrap() {
         let scenario = case["scenario"].as_str().unwrap();
@@ -63,7 +56,7 @@ fn search_outcomes_and_every_trial_match_r() {
                 }]
             },
             control,
-            ArithmeticProfile::R461MacArm,
+            ArithmeticProfile::AppleSiliconOpenBlas,
             |e| events.push(e),
         )
         .unwrap();
@@ -77,6 +70,7 @@ fn search_outcomes_and_every_trial_match_r() {
             convergence: case["result"]["convergence"].as_i64().unwrap() as i32,
             message: case["result"]["message"].as_str().unwrap().to_owned(),
         };
+        differences.record(&actual, &expected);
         let mut issues = support::compare(&actual, &expected, support::Contract::Exact);
         let expected_calls = case["calls"].as_array().unwrap();
         if calls.len() != expected_calls.len() {
@@ -147,5 +141,8 @@ fn search_outcomes_and_every_trial_match_r() {
             failures.push(format!("{}: {}", case["id"], issues.join("; ")));
         }
     }
+    differences.report("line_search");
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
+
+use support::fixtures::numbers;

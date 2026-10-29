@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use rcompat_lbfgsb::{optim_lbfgsb, Bounds, OptimControl};
+use rcompat_lbfgsb::{Bounds, OptimControl, optim_lbfgsb};
 
 #[test]
 fn public_api_optimizes_simple_quadratic() {

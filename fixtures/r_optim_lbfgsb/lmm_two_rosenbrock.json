@@ -14,8 +14,8 @@
   },
   "gradient_supplied": true,
   "result": {
-    "par": [1.0000008345300821, 1.0000017564531876],
-    "value": 1.4601823386488958e-12,
+    "par": [1.0000008345300406, 1.0000017564531039],
+    "value": 1.4601822577026152e-12,
     "counts": {
       "function": 53,
       "gradient": 53
@@ -23,6 +23,6 @@
     "convergence": 0,
     "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
   },
-  "r_version": "R version 4.6.1 (2026-06-24)",
-  "platform": "x86_64-conda-linux-gnu"
+  "r_version": "R version 4.6.2 (2026-10-29)",
+  "platform": "aarch64-apple-darwin27.2.0"
 }

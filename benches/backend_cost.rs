@@ -1,5 +1,5 @@
 //! Repeatable optimizer/callback cost probe; outputs CSV without runtime dependencies.
-use rcompat_lbfgsb::{optim_lbfgsb, optim_lbfgsb_with_gradient, Bounds, OptimControl};
+use rcompat_lbfgsb::{Bounds, OptimControl, optim_lbfgsb, optim_lbfgsb_with_gradient};
 use std::cell::Cell;
 use std::time::Instant;
 
@@ -95,7 +95,9 @@ fn main() {
                         }
                         samples.sort_unstable();
                         let (elapsed, callback, raw, optimizer) = samples[2];
-                        println!("{n},{lmm},{route},{work},{trace},{elapsed},{callback},{raw},{optimizer}");
+                        println!(
+                            "{n},{lmm},{route},{work},{trace},{elapsed},{callback},{raw},{optimizer}"
+                        );
                     }
                 }
             }

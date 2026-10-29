@@ -1,7 +1,7 @@
 [package]
 name = "rcompat-lbfgsb"
 version = "0.3.0"
-edition = "2021"
+edition = "2024"
 rust-version = "1.87"
 license = "MIT"
 description = "Rust implementation of R-style stats::optim L-BFGS-B behavior "
@@ -14,7 +14,7 @@ exclude = ["external/**", "data/**", "target/**", "**/__pycache__/**", "**/*.pyc
 [dependencies]
 
 [features]
-# R 4.6.1 macOS ARM / Clang contraction and Vortex short-dot arithmetic.
+# Apple Silicon / Clang contraction and Vortex short-dot arithmetic.
 arm-fma = []
 
 [dev-dependencies]
@@ -41,4 +41,5 @@ harness = false
 
 [[bench]]
 name = "api_options"
+path = "benches/api_options/main.rs"
 harness = false

@@ -29,8 +29,6 @@ pub(crate) struct BackendControl {
     pub(crate) lmm: usize,
     pub(crate) trace: usize,
     pub(crate) report: usize,
-    #[cfg(test)]
-    pub(crate) has_user_gradient: bool,
 }
 
 #[derive(Debug, Clone)]

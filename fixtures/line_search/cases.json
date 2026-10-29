@@ -1,11 +1,11 @@
 {
   "generator": "scripts/generate_line_search_fixtures.R",
   "generator_sha256": "505589318e46f19ceba252399337c133ec294354910e4504d1a439e51c8ecf9d",
-  "r_version": "R version 4.6.1 (2026-06-24)",
-  "platform": "aarch64-apple-darwin20.0.0",
-  "blas": "/Users/dendem/miniforge3/envs/deseq2-r461/lib/libopenblas.0.dylib",
+  "r_version": "R version 4.6.2 (2026-10-29)",
+  "platform": "aarch64-apple-darwin27.2.0",
+  "blas": "/Users/dendem/miniforge3/envs/deseq2-r462-native/lib/libopenblas.0.dylib",
   "threads": "1",
-  "session": ["R version 4.6.1 (2026-06-24)", "Platform: aarch64-apple-darwin20.0.0", "Running under: macOS Golden Gate 27.2", "", "Matrix products: default", "BLAS/LAPACK: /Users/dendem/miniforge3/envs/deseq2-r461/lib/libopenblas.0.dylib;  LAPACK version 3.12.0", "", "locale:", "[1] C.UTF-8/C.UTF-8/C.UTF-8/C/C.UTF-8/C.UTF-8", "", "time zone: Europe/Dublin", "tzcode source: system (macOS)", "", "attached base packages:", "[1] stats     graphics  grDevices utils     datasets  methods   base     ", "", "loaded via a namespace (and not attached):", "[1] compiler_4.6.1 tools_4.6.1    jsonlite_2.0.0"],
+  "session": ["R version 4.6.2 (2026-10-29)", "Platform: aarch64-apple-darwin27.2.0", "Running under: macOS Golden Gate 27.2", "", "Matrix products: default", "BLAS/LAPACK: /Users/dendem/miniforge3/envs/deseq2-r462-native/lib/libopenblas.0.dylib;  LAPACK version 3.12.0", "", "locale:", "[1] C.UTF-8/C.UTF-8/C.UTF-8/C/C.UTF-8/C.UTF-8", "", "time zone: Europe/Dublin", "tzcode source: internal", "", "attached base packages:", "[1] stats     graphics  grDevices utils     datasets  methods   base     ", "", "loaded via a namespace (and not attached):", "[1] compiler_4.6.2 jsonlite_2.0.0"],
   "cases": [
     {
       "id": "wrong_gradient:FALSE",

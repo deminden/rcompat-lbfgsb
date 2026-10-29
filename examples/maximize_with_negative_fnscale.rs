@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use rcompat_lbfgsb::{optim_lbfgsb, Bounds, OptimControl, OptimError};
+use rcompat_lbfgsb::{Bounds, OptimControl, OptimError, optim_lbfgsb};
 
 fn main() -> Result<(), OptimError> {
     let mut control = OptimControl::default_for_dimension(1);

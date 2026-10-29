@@ -8,7 +8,10 @@ fn main() {
     }
     println!("dimension,profile,observed,median_ns,event_count");
     for n in [16, 128, 1024] {
-        for profile in [ArithmeticProfile::R461X86, ArithmeticProfile::R461MacArm] {
+        for profile in [
+            ArithmeticProfile::X86OpenBlas,
+            ArithmeticProfile::AppleSiliconOpenBlas,
+        ] {
             let mut expected = None;
             for observed in [false, true] {
                 let mut times = Vec::new();

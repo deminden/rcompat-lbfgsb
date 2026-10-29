@@ -75,8 +75,6 @@ pub enum StepAcceptance {
     StepLimit,
     /// A sufficiently decreasing trial was accepted at a narrow bracket warning.
     BracketWarning,
-    /// Armijo sufficient decrease in a historical comparison probe.
-    Armijo,
 }
 
 /// Reason a line-search attempt ended without an accepted iterate.

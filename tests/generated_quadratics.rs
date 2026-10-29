@@ -6,7 +6,10 @@ use std::cell::Cell;
 fn constant_objectives_preserve_projected_parameters_and_initial_evaluations() {
     let mut executed = 0;
     for n in [1, 2, 11, 128] {
-        for profile in [ArithmeticProfile::R461X86, ArithmeticProfile::R461MacArm] {
+        for profile in [
+            ArithmeticProfile::X86OpenBlas,
+            ArithmeticProfile::AppleSiliconOpenBlas,
+        ] {
             for route in 0..3 {
                 for numeric in [false, true] {
                     for fnscale in [2.0, -2.0] {
@@ -84,7 +87,10 @@ fn constant_objectives_preserve_projected_parameters_and_initial_evaluations() {
 fn diagonal_quadratics_reach_known_box_solutions_across_routes() {
     let mut executed = 0;
     for n in [1, 2, 4, 9, 10, 11, 13, 128, 1024] {
-        for profile in [ArithmeticProfile::R461X86, ArithmeticProfile::R461MacArm] {
+        for profile in [
+            ArithmeticProfile::X86OpenBlas,
+            ArithmeticProfile::AppleSiliconOpenBlas,
+        ] {
             for route in 0..3 {
                 for lmm in [1, 5] {
                     for scale in [1e-8, 1.0, 1e8] {
@@ -148,7 +154,10 @@ fn diagonal_quadratics_reach_known_box_solutions_across_routes() {
                                 .zip(&expected)
                                 .map(|(a, b)| (a - b).abs())
                                 .fold(0.0_f64, f64::max);
-                            assert!(result.is_success() && error<1e-5,"n={n}, route={route}, lmm={lmm}, scale={scale}, numeric={numeric}, profile={profile:?}: error={error}; {result:?}");
+                            assert!(
+                                result.is_success() && error < 1e-5,
+                                "n={n}, route={route}, lmm={lmm}, scale={scale}, numeric={numeric}, profile={profile:?}: error={error}; {result:?}"
+                            );
                         }
                     }
                 }

@@ -1,28 +1,23 @@
-# Mixed/infinite-bound black-box oracle
+# Mixed-bound reference models
 
-`cases.json` contains 37 independent scalar quadratic/linear optim calls, generated
-with R 4.6.1 on macOS ARM. The embedded session, BLAS path, thread setting and
-SHA256 of `scripts/generate_mixed_bound_fixtures.R` identify the environment and
-recipe. The generator verifies every numeric field's binary64 serialization
-before replacing the artifact. No optimizer source is inspected or copied.
+37 public R 4.6.2 calls cover quadratic, linear and plateau objectives;
+finite/mixed/infinite bounds; both gradient forms; shallow curvature; zero
+budgets and unrepresentable targets.
 
-Regenerate from the repository root:
-
-```
-OPENBLAS_NUM_THREADS=1 /path/to/Rscript scripts/generate_mixed_bound_fixtures.R
+```sh
+cargo test --test mixed_bound_oracles
 ```
 
-The generator requires jsonlite and the `shasum` command. Start R with the
-thread environment set, rather than changing BLAS initialization afterward.
-Run `python3 scripts/verify_mixed_bound_fixture.py` to check recipe provenance
-without installing R. The four plateau/unrepresentable-target cases declare an
-exact-bit endpoint and initial-call contract.
+Replay selects `AppleSiliconOpenBlas`, requires exact bookkeeping and checks
+parameter/value error within `1e-8`/`1e-10`. Initial callback prefixes check
+stencils and normalization within `1e-12`; four plateau cases also require
+exact endpoint bits and initial-call counts.
 
-The Rust test explicitly selects the ARM arithmetic profile. It checks exact
-counts, convergence codes and messages, parameter error <=1e-8, value error
-<=1e-10, and the initial callback stencil/normalized trial to <=1e-12. These are
-numerical endpoint contracts, not universal bit-exact callback claims. Reference
-first-call prefixes are retained up to 80 calls. Cases cover dimensions 1/2/4/13,
-finite/mixed/infinite bounds, analytic/numerical gradients, shallow curvature,
-maxit=0, linear cap expansion, factr=0 rounded plateaus, and targets whose
-displacement is unrepresentable at the starting magnitude.
+Regenerate from the repository root with R 4.6.2, jsonlite and `shasum`:
+
+```sh
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 Rscript --vanilla scripts/generate_mixed_bound_fixtures.R
+```
+
+[Contracts and integrity checks](../../docs/validation.md) ·
+[Provenance](../../docs/provenance.md)

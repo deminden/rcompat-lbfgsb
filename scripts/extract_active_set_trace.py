@@ -43,7 +43,7 @@ def main():
     assert len(raw) == width * reference["result"]["counts"]["function"] == 1472
     assert not reference["gradient_calls"]
     witness = {"schema": 1, "identity": "active_set_cache_rounding", "id": case["id"],
-        "arithmetic_profile": "r461-macos-arm-openblas-0.3.34", "r_version": reference["r_version"],
+        "arithmetic_profile": "apple-silicon-openblas-0.3.34", "r_version": reference["r_version"],
         "platform": reference["platform"], "blas": reference["blas"], "threads": reference["threads"],
         "session": reference["session"], "build_config": metadata["build_config"], "generator": "scripts/extract_active_set_trace.py",
         "generator_sha256": digest(Path(__file__)), "input_sha256": digest(inputs),

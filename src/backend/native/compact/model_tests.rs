@@ -67,7 +67,10 @@ fn cyclic_model_matches_dense_bfgs_and_unbounded_newton_steps() {
     let mut checked = 0;
     for n in [1, 2, 4, 9, 10, 11, 13, 32, 64] {
         for memory in [1, 3, 5] {
-            for profile in [ArithmeticProfile::R461X86, ArithmeticProfile::R461MacArm] {
+            for profile in [
+                ArithmeticProfile::X86OpenBlas,
+                ArithmeticProfile::AppleSiliconOpenBlas,
+            ] {
                 let lower = vec![f64::NEG_INFINITY; n];
                 let upper = vec![f64::INFINITY; n];
                 let mut state = ExactCompactState::new(profile, n, memory, &lower, &upper);
@@ -131,7 +134,7 @@ fn cyclic_model_matches_dense_bfgs_and_unbounded_newton_steps() {
                     let expected =
                         independent_solve(&dense, &g.iter().map(|v| -v).collect::<Vec<_>>());
                     let choice = state
-                        .direction(&vec![0.0; n], &g, &lower, &upper, 1.0, MAIN_PATH_MIN_STEP)
+                        .direction(&vec![0.0; n], &g, &lower, &upper, 1.0)
                         .unwrap();
                     close(&choice.direction, &expected);
                     assert_eq!(state.snapshot().free, n);
@@ -146,7 +149,10 @@ fn cyclic_model_matches_dense_bfgs_and_unbounded_newton_steps() {
 
 #[test]
 fn free_partition_tracks_entering_and_leaving_sets() {
-    for profile in [ArithmeticProfile::R461X86, ArithmeticProfile::R461MacArm] {
+    for profile in [
+        ArithmeticProfile::X86OpenBlas,
+        ArithmeticProfile::AppleSiliconOpenBlas,
+    ] {
         let mut state = ExactCompactState::new(profile, 8, 3, &[-1.0; 8], &[1.0; 8]);
         let mut previous = vec![true; 8];
         for mask in 0..256 {
@@ -189,7 +195,7 @@ fn retained_storage_is_linear_in_dimension_at_fixed_history() {
     for n in [1, 2, 9, 10, 11, 13, 128, 1024] {
         for m in [1, 5, 10] {
             let state = ExactCompactState::new(
-                ArithmeticProfile::R461X86,
+                ArithmeticProfile::X86OpenBlas,
                 n,
                 m,
                 &vec![-1.0; n],

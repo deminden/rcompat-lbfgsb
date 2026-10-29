@@ -55,15 +55,20 @@ fn legacy_entry_points_keep_their_arithmetic_contract() {
 #[test]
 fn explicit_profiles_are_deterministic_when_alternated_and_run_concurrently() {
     for numeric in [false, true] {
-        let x86 = bits(&run(ArithmeticProfile::R461X86, numeric));
-        let arm = bits(&run(ArithmeticProfile::R461MacArm, numeric));
+        let x86 = bits(&run(ArithmeticProfile::X86OpenBlas, numeric));
+        let arm = bits(&run(ArithmeticProfile::AppleSiliconOpenBlas, numeric));
         assert_ne!(x86, arm, "probe must expose the rounding distinction");
         for _ in 0..3 {
-            assert_eq!(bits(&run(ArithmeticProfile::R461MacArm, numeric)), arm);
-            assert_eq!(bits(&run(ArithmeticProfile::R461X86, numeric)), x86);
+            assert_eq!(
+                bits(&run(ArithmeticProfile::AppleSiliconOpenBlas, numeric)),
+                arm
+            );
+            assert_eq!(bits(&run(ArithmeticProfile::X86OpenBlas, numeric)), x86);
         }
-        let a = std::thread::spawn(move || bits(&run(ArithmeticProfile::R461MacArm, numeric)));
-        let b = std::thread::spawn(move || bits(&run(ArithmeticProfile::R461X86, numeric)));
+        let a = std::thread::spawn(move || {
+            bits(&run(ArithmeticProfile::AppleSiliconOpenBlas, numeric))
+        });
+        let b = std::thread::spawn(move || bits(&run(ArithmeticProfile::X86OpenBlas, numeric)));
         assert_eq!(a.join().unwrap(), arm);
         assert_eq!(b.join().unwrap(), x86);
     }
@@ -71,11 +76,14 @@ fn explicit_profiles_are_deterministic_when_alternated_and_run_concurrently() {
 
 #[test]
 fn nested_callback_with_another_profile_does_not_change_outer_run() {
-    for outer in [ArithmeticProfile::R461X86, ArithmeticProfile::R461MacArm] {
-        let inner = if outer == ArithmeticProfile::R461X86 {
-            ArithmeticProfile::R461MacArm
+    for outer in [
+        ArithmeticProfile::X86OpenBlas,
+        ArithmeticProfile::AppleSiliconOpenBlas,
+    ] {
+        let inner = if outer == ArithmeticProfile::X86OpenBlas {
+            ArithmeticProfile::AppleSiliconOpenBlas
         } else {
-            ArithmeticProfile::R461X86
+            ArithmeticProfile::X86OpenBlas
         };
         let expected = bits(&run(outer, false));
         let mut first = true;

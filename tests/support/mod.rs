@@ -1,6 +1,38 @@
 #![allow(dead_code)]
 
+pub mod fixtures;
+
 use rcompat_lbfgsb::OptimResult;
+
+/// Observed absolute differences, reported separately from acceptance tolerances.
+#[derive(Default)]
+pub struct MaxAbsoluteDifferences {
+    cases: usize,
+    parameters: f64,
+    objective: f64,
+}
+
+impl MaxAbsoluteDifferences {
+    pub fn record(&mut self, actual: &OptimResult, expected: &OptimResult) {
+        self.cases += 1;
+        self.parameters = self
+            .parameters
+            .max(parameter_error(&actual.par, &expected.par));
+        let error = if actual.value.is_finite() && expected.value.is_finite() {
+            (actual.value - expected.value).abs()
+        } else {
+            f64::INFINITY
+        };
+        self.objective = self.objective.max(error);
+    }
+
+    pub fn report(&self, cohort: &str) {
+        eprintln!(
+            "max_abs_differences cohort={cohort} cases={} parameters={:.17e} objective={:.17e}",
+            self.cases, self.parameters, self.objective
+        );
+    }
+}
 
 /// The contract a recorded reference promises for floating-point fields.
 #[derive(Clone, Copy)]
@@ -75,8 +107,8 @@ pub fn compare(actual: &OptimResult, expected: &OptimResult, contract: Contract)
     failures
 }
 
-/// Execute a fixture using its declared x86 reference arithmetic, regardless of features.
-pub fn optim_x86<F>(
+/// Execute a fixture using its declared reference arithmetic, regardless of features.
+pub fn optim_reference<F>(
     par: Vec<f64>,
     bounds: rcompat_lbfgsb::Bounds,
     objective: F,
@@ -90,12 +122,12 @@ where
         bounds,
         objective,
         control,
-        rcompat_lbfgsb::ArithmeticProfile::R461X86,
+        rcompat_lbfgsb::ArithmeticProfile::AppleSiliconOpenBlas,
     )
 }
 
-/// Supplied-gradient version of the explicitly pinned x86 fixture adapter.
-pub fn optim_x86_with_gradient<F, G>(
+/// Supplied-gradient version of the explicitly pinned fixture adapter.
+pub fn optim_reference_with_gradient<F, G>(
     par: Vec<f64>,
     bounds: rcompat_lbfgsb::Bounds,
     objective: F,
@@ -112,18 +144,8 @@ where
         objective,
         gradient,
         control,
-        rcompat_lbfgsb::ArithmeticProfile::R461X86,
+        rcompat_lbfgsb::ArithmeticProfile::AppleSiliconOpenBlas,
     )
-}
-
-/// Enable the complete bit contract explicitly on the pinned reference runner.
-/// Diagnostic scan flags never weaken this or the default numerical contract.
-pub fn x86_reference_contract(parameters: f64, value: f64) -> Contract {
-    match std::env::var("LBFGSB_EXACT_REFERENCE") {
-        Ok(value) if value == "1" => Contract::Exact,
-        Err(std::env::VarError::NotPresent) => Contract::Numerical { parameters, value },
-        _ => panic!("LBFGSB_EXACT_REFERENCE must be absent or exactly 1"),
-    }
 }
 
 /// Accuracy evidence from a package fit whose optimizer path may legitimately differ.

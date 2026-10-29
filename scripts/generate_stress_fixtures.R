@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Replacement corpus from independent formulas, not the missing historical data.
+# Self-contained stress corpus from independently defined formulas.
 args <- commandArgs(TRUE)
 out <- if(length(args)) args[[1]] else "fixtures/synthetic_v1/cases.json"
 stopifnot(requireNamespace("jsonlite", quietly=TRUE), as.character(getRversion())==Sys.getenv("ORACLE_R_VERSION","4.6.2"))
@@ -81,7 +81,7 @@ script_path<-sub("^--file=","",grep("^--file=",commandArgs(FALSE),value=TRUE)[[1
 script_hash<-strsplit(system2("shasum",c("-a","256",shQuote(script_path)),stdout=TRUE),"[[:space:]]+")[[1]][[1]]
 source(file.path(dirname(script_path),"oracle_json.R"))
 helper_hash<-strsplit(system2("shasum",c("-a","256",shQuote(file.path(dirname(script_path),"oracle_json.R"))),stdout=TRUE),"[[:space:]]+")[[1]][[1]]
-manifest<-list(serializer_sha256=helper_hash,schema=1L,identity="synthetic_v1",arithmetic_profile="r461-macos-arm-openblas-0.3.34",replacement_for="unavailable historical 2026-07-22 corpus; cases are different",
+manifest<-list(serializer_sha256=helper_hash,schema=1L,identity="synthetic_v1",arithmetic_profile="apple-silicon-openblas-0.3.34",
  generator="scripts/generate_stress_fixtures.R",generator_sha256=script_hash,r_version=R.version.string,platform=R.version$platform,
  blas=unname(extSoftVersion()[["BLAS"]]),threads=Sys.getenv("OPENBLAS_NUM_THREADS"),
  build_config=lapply(setNames(c("CC","CFLAGS","CXX","CXXFLAGS","FC","FFLAGS"),c("CC","CFLAGS","CXX","CXXFLAGS","FC","FFLAGS")),function(key)system2(file.path(R.home("bin"),"R"),c("CMD","config",key),stdout=TRUE)),

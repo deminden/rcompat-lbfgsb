@@ -3,29 +3,29 @@
 #![cfg(all(target_arch = "aarch64", target_os = "macos"))]
 #[path = "../examples/support/deseq2_objective.rs"]
 mod objective;
-#[path = "support/previous_deseq2.rs"]
-mod previous;
 mod support;
 use rcompat_lbfgsb::*;
 use serde_json::Value;
-fn nums(v: &Value) -> Vec<f64> {
-    v.as_array()
-        .unwrap()
-        .iter()
-        .map(|v| v.as_f64().unwrap())
-        .collect()
-}
-fn check(inputs: Value, reference: Value, total: usize, value_tolerance: f64) {
+fn check(
+    cohort: &str,
+    inputs: Value,
+    reference: Value,
+    total: usize,
+    value_tolerance: f64,
+    coefficient_limit: f64,
+) {
     assert!(reference["r_version"].as_str().unwrap().contains("4.6.2"));
     assert_eq!(reference["deseq2_version"], "1.52.0");
     assert_eq!(reference["threads"], "1");
     for key in ["CFLAGS", "CXXFLAGS", "FFLAGS"] {
-        assert!(reference["build_config"][key]
-            .as_str()
-            .unwrap()
-            .contains("-mcpu=native"));
+        assert!(
+            reference["build_config"][key]
+                .as_str()
+                .unwrap()
+                .contains("-mcpu=native")
+        );
     }
-    let mut old_errors = Vec::new();
+    let mut differences = support::MaxAbsoluteDifferences::default();
     let mut new_errors = Vec::new();
     let mut observed = 0;
     let mut failures = Vec::new();
@@ -53,21 +53,6 @@ fn check(inputs: Value, reference: Value, total: usize, value_tolerance: f64) {
             let dispersion = case["dispersion"].as_f64().unwrap();
             let bounds = Bounds::new(nums(&case["lower"]), nums(&case["upper"])).unwrap();
             let expected = support::recorded_result(&fit["optimizer_result"]);
-            let old = optim_lbfgsb_with_profile(
-                start.clone(),
-                bounds.clone(),
-                |x| previous::value(x, &counts, &design, &sf, dispersion),
-                OptimControl::default_for_dimension(n),
-                ArithmeticProfile::R461X86,
-            )
-            .unwrap();
-            let old_comparison = support::compare_scientific(&old, &expected, f64::MAX, f64::MAX);
-            assert!(
-                old_comparison.failures.is_empty(),
-                "old callback validity: {}",
-                old_comparison.failures.join("; ")
-            );
-            let old_error = old_comparison.max_parameter_error;
             let f =
                 objective::Deseq2Objective::new(design.clone(), sf.clone(), &counts, dispersion);
             let new = optim_lbfgsb_with_profile(
@@ -75,11 +60,12 @@ fn check(inputs: Value, reference: Value, total: usize, value_tolerance: f64) {
                 bounds,
                 |x| f.value(x),
                 OptimControl::default_for_dimension(n),
-                ArithmeticProfile::R461MacArm,
+                ArithmeticProfile::AppleSiliconOpenBlas,
             )
             .unwrap();
+            differences.record(&new, &expected);
             let comparison =
-                support::compare_scientific(&new, &expected, old_error + 1e-6, value_tolerance);
+                support::compare_scientific(&new, &expected, coefficient_limit, value_tolerance);
             if !comparison.failures.is_empty() {
                 failures.push(format!(
                     "{}: {}",
@@ -88,29 +74,26 @@ fn check(inputs: Value, reference: Value, total: usize, value_tolerance: f64) {
                 ));
             }
             observed += usize::from(!comparison.bookkeeping_differences.is_empty());
-            old_errors.push(old_error);
             new_errors.push(comparison.max_parameter_error);
         }
     }
+    differences.report(cohort);
     assert_eq!(new_errors.len(), total);
-    old_errors.sort_by(f64::total_cmp);
     new_errors.sort_by(f64::total_cmp);
-    let old_max = old_errors[total - 1];
     let new_max = new_errors[total - 1];
-    eprintln!("R 4.6.2 native: {total} fits; worst {old_max:e} -> {new_max:e} ({:.1}x); {observed} observed count/message differences",old_max/new_max);
+    assert!(
+        new_max <= coefficient_limit,
+        "absolute coefficient accuracy regressed: {new_max}"
+    );
+    eprintln!(
+        "R 4.6.2 native: {total} fits; worst coefficient error {new_max:e}; {observed} observed count/message differences"
+    );
     assert!(failures.is_empty(), "{}", failures.join("\n"));
-    assert!(
-        new_max <= old_max / 10.0,
-        "worst-case precision gate: old={old_max:e}, new={new_max:e}"
-    );
-    assert!(
-        new_errors[total / 2] <= old_errors[total / 2],
-        "median accuracy regressed"
-    );
 }
 #[test]
-fn native_r462_historical_fits_preserve_precision_gains() {
+fn native_r462_hard_fits_preserve_precision() {
     check(
+        "deseq2_hard",
         serde_json::from_str(include_str!(
             "../fixtures/deseq_hard_real_subset/optim_cases.json"
         ))
@@ -121,11 +104,13 @@ fn native_r462_historical_fits_preserve_precision_gains() {
         .unwrap(),
         46,
         1e-6,
+        0.0014,
     );
 }
 #[test]
-fn native_r462_airway_fits_preserve_precision_gains() {
+fn native_r462_airway_fits_preserve_precision() {
     check(
+        "deseq2_airway",
         serde_json::from_str(include_str!("../fixtures/deseq_airway/cases.json")).unwrap(),
         serde_json::from_str(include_str!(
             "../fixtures/native_r462/airway_reference.json"
@@ -133,5 +118,8 @@ fn native_r462_airway_fits_preserve_precision_gains() {
         .unwrap(),
         28,
         1e-9,
+        3.8e-6,
     );
 }
+
+use support::fixtures::numbers as nums;

@@ -3,7 +3,7 @@
 mod objective;
 
 use objective::Deseq2Objective;
-use rcompat_lbfgsb::{optim_lbfgsb_with_profile, ArithmeticProfile, Bounds, OptimControl};
+use rcompat_lbfgsb::{ArithmeticProfile, Bounds, OptimControl, optim_lbfgsb_with_profile};
 use serde_json::Value;
 
 fn nums(v: &Value) -> Vec<f64> {
@@ -15,17 +15,21 @@ fn nums(v: &Value) -> Vec<f64> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let path = std::env::args_os()
-        .nth(1)
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|| {
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("fixtures/deseq_airway/cases.json")
-        });
-    let fixture: Value = serde_json::from_str(&std::fs::read_to_string(path)?)?;
-    let fits = fixture["reference"]["results"]
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let arguments: Vec<_> = std::env::args_os().skip(1).collect();
+    let (input_path, reference_path) = match arguments.as_slice() {
+        [] => (
+            root.join("fixtures/deseq_airway/cases.json"),
+            root.join("fixtures/native_r462/airway_reference.json"),
+        ),
+        [inputs, reference] => (inputs.into(), reference.into()),
+        _ => return Err("usage: deseq2 [INPUT_JSON REFERENCE_JSON]".into()),
+    };
+    let fixture: Value = serde_json::from_str(&std::fs::read_to_string(input_path)?)?;
+    let reference: Value = serde_json::from_str(&std::fs::read_to_string(reference_path)?)?;
+    let fits = reference["results"]
         .as_array()
-        .ok_or("expected a fixture with embedded DESeq2 reference results")?;
+        .ok_or("expected DESeq2 package reference results")?;
     for contrast in fixture["contrasts"].as_array().unwrap() {
         let design: Vec<_> = contrast["design"]
             .as_array()
@@ -38,7 +42,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let fit = fits
                 .iter()
                 .find(|fit| fit["fixture"] == case["fixture"])
-                .unwrap();
+                .ok_or_else(|| format!("missing package reference for {}", case["fixture"]))?;
+            if fit["optimizer_start"].is_null() {
+                continue;
+            }
             let start = nums(&fit["optimizer_start"]);
             let dimension = start.len();
             let objective = Deseq2Objective::new(
@@ -52,12 +59,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Bounds::new(nums(&case["lower"]), nums(&case["upper"]))?,
                 |beta| objective.value(beta),
                 OptimControl::default_for_dimension(dimension),
-                ArithmeticProfile::R461MacArm,
+                ArithmeticProfile::AppleSiliconOpenBlas,
             )?;
+            let expected = nums(&fit["beta"]);
+            if result.par.len() != expected.len() {
+                return Err(format!("coefficient count mismatch for {}", case["fixture"]).into());
+            }
             let error = result
                 .par
                 .iter()
-                .zip(nums(&fit["beta"]))
+                .zip(expected)
                 .map(|(a, b)| (a - b).abs())
                 .fold(0.0_f64, f64::max);
             println!(

@@ -2,15 +2,15 @@
 """Check allocation probe coverage, result preservation and dimension growth."""
 import argparse
 import csv
-import hashlib
 from itertools import product
 import json
 from pathlib import Path
+from integrity import sha256_file, verify_hashes
 import re
 
 ROOT = Path(__file__).resolve().parent.parent
 IDENTITY = ["dimension", "lmm", "route", "callback_work", "profile"]
-PROFILES = ["r461-x86-openblas-0.3.32", "r461-macos-arm-openblas-0.3.34"]
+PROFILES = ["x86-openblas-0.3.32", "apple-silicon-openblas-0.3.34"]
 
 
 def load(path):
@@ -48,9 +48,9 @@ def load(path):
 def verify_archives():
     directory = ROOT / "measurements/2026-10-29"
     metadata = json.loads((directory / "environment.json").read_text())
-    for name, digest in metadata["files"].items():
-        assert hashlib.sha256((ROOT / name).read_bytes()).hexdigest() == digest, f"recorded measurement input/evidence changed: {name}"
-    assert hashlib.sha256((ROOT / "src/backend/native/compact.rs").read_bytes()).hexdigest() == metadata["compact_after_sha256"], "compact source changed: rerun the allocation baseline comparison"
+    verify_hashes(ROOT, metadata["files"], "recorded measurement input/evidence changed")
+    assert sha256_file(ROOT / "src/backend/native/compact.rs") == metadata["compact_after_sha256"], "compact source changed: rerun the allocation baseline comparison"
+    verify_hashes(ROOT, metadata["production_after"], "allocation production source changed; rerun measurements")
     after, native = load(directory / "allocation_after.csv"), load(directory / "allocation_native.csv")
     owned = load(directory / "allocation_owned.csv")
     for key, row in after.items():

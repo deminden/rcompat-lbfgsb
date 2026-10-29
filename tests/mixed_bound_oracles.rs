@@ -1,27 +1,17 @@
-//! Black-box R 4.6.1 oracle for mixed/unbounded routing and first-step behavior.
+//! Black-box R 4.6.2 oracle for mixed/unbounded routing and first-step behavior.
 #![allow(missing_docs)]
 mod support;
 use rcompat_lbfgsb::*;
 use serde_json::Value;
-fn numbers(v: &Value) -> Vec<f64> {
-    v.as_array()
-        .unwrap()
-        .iter()
-        .map(|x| match x.as_str() {
-            Some("Inf") => f64::INFINITY,
-            Some("-Inf") => f64::NEG_INFINITY,
-            _ => x.as_f64().unwrap(),
-        })
-        .collect()
-}
 #[test]
 fn mixed_and_unbounded_paths_match_recorded_r_results() {
     let fixture: Value =
         serde_json::from_str(include_str!("../fixtures/mixed_bounds/cases.json")).unwrap();
-    assert!(fixture["r_version"].as_str().unwrap().contains("4.6.1"));
-    assert_eq!(fixture["platform"], "aarch64-apple-darwin20.0.0");
+    assert!(fixture["r_version"].as_str().unwrap().contains("4.6.2"));
+    assert_eq!(fixture["platform"], "aarch64-apple-darwin27.2.0");
     assert_eq!(fixture["cases"].as_array().unwrap().len(), 37);
     assert_eq!(fixture["generator_sha256"].as_str().unwrap().len(), 64);
+    let mut differences = support::MaxAbsoluteDifferences::default();
     let mut failures = Vec::new();
     for case in fixture["cases"].as_array().unwrap() {
         let initial = numbers(&case["initial"]);
@@ -63,10 +53,16 @@ fn mixed_and_unbounded_paths_match_recorded_r_results() {
                 f,
                 g,
                 c,
-                ArithmeticProfile::R461MacArm,
+                ArithmeticProfile::AppleSiliconOpenBlas,
             )
         } else {
-            optim_lbfgsb_with_profile(initial, bounds, f, c, ArithmeticProfile::R461MacArm)
+            optim_lbfgsb_with_profile(
+                initial,
+                bounds,
+                f,
+                c,
+                ArithmeticProfile::AppleSiliconOpenBlas,
+            )
         }
         .unwrap();
         let expected = OptimResult {
@@ -88,6 +84,7 @@ fn mixed_and_unbounded_paths_match_recorded_r_results() {
                 value: 1e-10,
             }
         };
+        differences.record(&actual, &expected);
         let mut issues = support::compare(&actual, &expected, contract);
         // Trace comparison covers the normalized first trial and finite-difference order.
         let prefix = case["first_calls"].as_array().unwrap();
@@ -123,5 +120,8 @@ fn mixed_and_unbounded_paths_match_recorded_r_results() {
             failures.push(format!("{}: {}", case["id"], issues.join("; ")));
         }
     }
+    differences.report("mixed_bounds");
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
+
+use support::fixtures::numbers;

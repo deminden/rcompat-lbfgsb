@@ -1,6 +1,6 @@
---- a/src/backend/native/compact.rs
-+++ b/src/backend/native/compact.rs
-@@ -561,13 +561,6 @@
+--- a/src/backend/native/compact/history.rs
++++ b/src/backend/native/compact/history.rs
+@@ -33,13 +33,6 @@
          }
  
          let dtd = self.profile.short_dot(direction, direction);
@@ -14,7 +14,7 @@
          self.iupdat += 1;
          if self.iupdat <= self.memory {
              self.col = self.iupdat;
-@@ -577,7 +570,12 @@
+@@ -49,7 +42,12 @@
              self.head = (self.head + 1) % self.memory;
          }
  
@@ -28,7 +28,7 @@
          self.wy[self.itail].copy_from_slice(gradient_difference);
          self.theta = rr / dr;
  
-@@ -594,10 +592,12 @@
+@@ -66,10 +64,12 @@
  
          let mut pointer = self.head;
          for previous in 0..self.col - 1 {
@@ -45,7 +45,9 @@
              pointer = (pointer + 1) % self.memory;
          }
          self.ss[self.col - 1][self.col - 1] = if alpha == 1.0 {
-@@ -1143,14 +1143,17 @@
+--- a/src/backend/native/compact/subspace.rs
++++ b/src/backend/native/compact/subspace.rs
+@@ -199,14 +199,17 @@
          if coherent_cholesky_upper_in_place(self.profile, &mut self.wn, 0, col).is_none() {
              return false;
          }

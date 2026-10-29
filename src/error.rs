@@ -111,7 +111,10 @@ impl fmt::Display for OptimError {
                 None => write!(f, "invalid bounds: {reason}"),
             },
             Self::NonFiniteInitialParameter { index, value } => {
-                write!(f, "initial parameter at index {index} is not finite: {value}")
+                write!(
+                    f,
+                    "initial parameter at index {index} is not finite: {value}"
+                )
             }
             Self::InitialParameterOutOfBounds {
                 index,
@@ -139,8 +142,15 @@ impl fmt::Display for OptimError {
                 ),
                 None => write!(f, "invalid gradient: {reason}"),
             },
-            Self::NumericalFailure { operation, index, value } => {
-                write!(f, "non-finite result during {operation} at coordinate {index:?}: {value}")
+            Self::NumericalFailure {
+                operation,
+                index,
+                value,
+            } => {
+                write!(
+                    f,
+                    "non-finite result during {operation} at coordinate {index:?}: {value}"
+                )
             }
             Self::BackendFailure { message } => write!(f, "backend failure: {message}"),
         }

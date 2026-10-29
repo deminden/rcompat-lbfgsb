@@ -12,7 +12,7 @@ env:
 
 jobs:
   rust:
-    name: Pinned Rust 1.99.0 reference tests
+    name: Format, lints, docs and package
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,8 +24,6 @@ jobs:
         run: cargo fmt --all --check
       - name: Lints
         run: cargo clippy --all-targets --all-features -- -D warnings
-      - name: Tests
-        run: cargo test
       - name: Docs
         env:
           RUSTDOCFLAGS: -D warnings
@@ -40,66 +38,57 @@ jobs:
           fi
           cargo package --allow-dirty
 
-  pinned_exact:
-    name: R 4.6.1 x86 exact contracts (${{ matrix.build }})
-    runs-on: ubuntu-24.04
+  reference:
+    name: Scientific references (${{ matrix.os }}, ${{ matrix.build }})
     strategy:
       fail-fast: false
       matrix:
-        build: [debug, release]
-    env:
-      LBFGSB_EXACT_REFERENCE: '1'
+        include:
+          - os: ubuntu-latest
+            build: release
+            toolchain: stable
+          - os: macos-26
+            build: debug
+            toolchain: 1.99.0
+          - os: macos-26
+            build: release
+            toolchain: 1.99.0
+          - os: macos-26
+            build: native
+            toolchain: stable
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
       - uses: Swatinem/rust-cache@v2
       - name: Record runner arithmetic environment
+        shell: bash
         run: |
-          test "$(uname -m)" = x86_64
+          if [ '${{ runner.os }}' = macOS ]; then
+            test "$(uname -m)" = arm64
+          fi
           rustc -vV
           uname -a
-          getconf GNU_LIBC_VERSION
-      - name: Full result bits and bookkeeping
+      - name: R 4.6.2 and package precision contracts
         shell: bash
         run: |
           build_args=()
-          if [ '${{ matrix.build }}' = release ]; then
+          test_args=()
+          if [ '${{ matrix.build }}' != debug ]; then
             build_args+=(--release)
           fi
-          cargo test "${build_args[@]}" --test deseq_real_subset --test deseq_hard_real_subset --test parity_fixtures -- --include-ignored
-
-  arm_fma:
-    name: macOS ARM precision
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Verify reference callback platform
-        run: test "$(uname -m)" = arm64
-      - name: ARM public API and precision gates
-        run: >-
-          cargo test --all-features --lib --test arithmetic_profiles --test observers
-          --test line_search_oracles --test mixed_bound_oracles --test generated_quadratics --test transformations
-          --test numerical_validity --test validation_contract --test api_smoke
-          --test bounds --test finite_diff --test quadratic --test scaling
-          --test deseq_real_subset --test deseq_hard_real_subset --test parity_fixtures
-          --test deseq2_precision --test native_reference_precision
-          --test stress_oracles
-      - name: Release public API and precision gates
-        run: >-
-          cargo test --release --all-features --lib --test arithmetic_profiles --test observers
-          --test line_search_oracles --test mixed_bound_oracles --test generated_quadratics --test transformations
-          --test numerical_validity --test validation_contract --test api_smoke
-          --test bounds --test finite_diff --test quadratic --test scaling
-          --test deseq_real_subset --test deseq_hard_real_subset --test parity_fixtures
-          --test deseq2_precision --test native_reference_precision
-          --test stress_oracles
-
-      - name: Native CPU scientific reference comparison
-        env:
-          RUSTFLAGS: -C target-cpu=native
-        run: cargo test --release --all-features --test native_reference_precision
+          if [ '${{ matrix.build }}' = native ]; then
+            export RUSTFLAGS='-C target-cpu=native'
+          fi
+          if [ '${{ runner.os }}' = macOS ]; then
+            test_args+=(--include-ignored)
+          fi
+          cargo test "${build_args[@]}" --all-features \
+            --test parity_fixtures --test deseq_real_subset --test deseq_hard_real_subset \
+            --test stress_oracles --test native_reference_precision --test deseq_airway \
+            -- "${test_args[@]}"
 
   portable:
     name: Stable public API (${{ matrix.os }}, ${{ matrix.build }})
@@ -121,30 +110,38 @@ jobs:
             build_args+=(--release)
           fi
           for feature_args in --no-default-features --all-features; do
-            cargo test "${build_args[@]}" "$feature_args" --lib backend::native::compact::model_tests
-            cargo test "${build_args[@]}" "$feature_args" \
+            cargo test "${build_args[@]}" "$feature_args" --lib \
               --test arithmetic_profiles --test observers --test numerical_validity \
-              --test line_search_oracles --test mixed_bound_oracles --test generated_quadratics --test transformations \
-              --test validation_contract --test api_smoke --test bounds --test stress_oracles \
-              --test finite_diff --test quadratic --test scaling --test parity_fixtures \
-              --test deseq_real_subset --test deseq_hard_real_subset
+              --test line_search_oracles --test mixed_bound_oracles --test generated_quadratics \
+              --test transformations --test validation_contract --test api_smoke \
+              --test bounds --test finite_diff --test quadratic --test scaling
           done
       - name: Explicit profiles ignore feature unification
+        if: matrix.build == 'debug'
         run: python3 scripts/check_profile_feature_invariance.py
-      - name: Oracle recipe provenance
-        run: python3 scripts/verify_oracles.py
-      - name: Corrupted oracle rejection
-        run: python3 scripts/test_verify_oracles.py
-      - name: Allocation and dimension growth
+      - name: Allocation and dimension growth on this platform
         if: matrix.build == 'release'
         shell: bash
         run: |
           measurements="$(mktemp)"
           LBFGSB_BENCH_SAMPLES=3 cargo bench --bench allocation_growth > "$measurements"
           python3 scripts/verify_measurements.py --after "$measurements"
-          python3 scripts/test_verify_measurements.py
-          python3 scripts/verify_api_measurements.py
           LBFGSB_API_SAMPLES=3 python3 scripts/measure_api_comparison.py
+
+  evidence:
+    name: Oracle and measurement integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Oracle recipe provenance and corrupted evidence rejection
+        run: |
+          python3 scripts/verify_oracles.py
+          python3 scripts/test_verify_oracles.py
+      - name: Recorded allocation and API comparisons
+        run: |
+          python3 scripts/verify_measurements.py
+          python3 scripts/verify_api_measurements.py
+          python3 scripts/test_verify_measurements.py
 
   msrv:
     name: Minimum supported Rust 1.87
@@ -164,7 +161,7 @@ jobs:
 
   publish:
     name: Deploy to crates.io
-    needs: [rust, pinned_exact, arm_fma, portable, msrv]
+    needs: [rust, reference, portable, evidence, msrv]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     concurrency:

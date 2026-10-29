@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use rcompat_lbfgsb::{optim_lbfgsb, optim_lbfgsb_with_gradient, Bounds, OptimControl, OptimError};
+use rcompat_lbfgsb::{Bounds, OptimControl, OptimError, optim_lbfgsb, optim_lbfgsb_with_gradient};
 
 #[test]
 fn active_lower_bound_is_respected() {

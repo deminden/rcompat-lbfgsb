@@ -57,7 +57,7 @@ class MeasurementGate(unittest.TestCase):
                     elif mutation == "growth":
                         # Preserve callback accounting and before/after savings,
                         # but make the fourfold-dimension growth implausible.
-                        row = next(r for r in rows if r["dimension"] == "128" and r["lmm"] == "1" and r["route"] == "finite" and r["callback_work"] == "1" and r["profile"].startswith("r461-x86"))
+                        row = next(r for r in rows if r["dimension"] == "128" and r["lmm"] == "1" and r["route"] == "finite" and r["callback_work"] == "1" and r["profile"].startswith("x86-openblas"))
                         row["bytes_allocated"] = str(int(row["callback_bytes"]) + 1)
                     with path.open("w") as stream:
                         writer = csv.DictWriter(stream, fieldnames=list(original[0]))

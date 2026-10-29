@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use rcompat_lbfgsb::{optim_lbfgsb, optim_lbfgsb_with_gradient, Bounds, OptimControl};
+use rcompat_lbfgsb::{Bounds, OptimControl, optim_lbfgsb, optim_lbfgsb_with_gradient};
 
 #[test]
 fn negative_fnscale_maximizes_user_objective() {

@@ -1,5 +1,5 @@
 //! Independent full negative-binomial GLM objective with the DESeq2 sd=1000
-//! coefficient prior. Intended for the recorded R 4.6.1 / DESeq2 1.52 fits.
+//! coefficient prior. Intended for the recorded R 4.6.2 / DESeq2 1.52 fits.
 //! Formulas: Loader's saddlepoint expansion and the log-gamma power series.
 //! No R implementation text or runtime dependency is used.
 #![allow(missing_docs, clippy::excessive_precision)]

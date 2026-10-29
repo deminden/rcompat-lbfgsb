@@ -14,15 +14,15 @@
   },
   "gradient_supplied": false,
   "result": {
-    "par": [2.4028137617207181, 1.1464007695880178],
-    "value": -1.2758707777727656,
+    "par": [2.4028137617316951, 1.1464007695880205],
+    "value": -1.2758707777727658,
     "counts": {
-      "function": 44,
-      "gradient": 44
+      "function": 22,
+      "gradient": 22
     },
     "convergence": 0,
     "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
   },
-  "r_version": "R version 4.6.1 (2026-06-24)",
-  "platform": "x86_64-conda-linux-gnu"
+  "r_version": "R version 4.6.2 (2026-10-29)",
+  "platform": "aarch64-apple-darwin27.2.0"
 }

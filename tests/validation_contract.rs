@@ -1,7 +1,7 @@
 //! Tests that the reference comparator detects corrupted evidence.
 mod support;
 use rcompat_lbfgsb::{OptimCounts, OptimResult};
-use support::{compare, Contract};
+use support::{Contract, compare};
 
 fn reference() -> OptimResult {
     OptimResult {
@@ -106,5 +106,22 @@ fn scientific_accuracy_distinguishes_failures_from_observed_bookkeeping() {
         );
         assert!(!result.max_parameter_error.is_nan());
         assert!(!result.value_error.is_nan());
+    }
+}
+
+#[test]
+fn shared_fixture_decoder_preserves_signed_zero_and_rejects_invalid_numbers() {
+    let decoded = support::fixtures::numbers(&serde_json::json!([-0.0, "Inf", "-Inf", 1.25]));
+    assert_eq!(decoded[0].to_bits(), (-0.0_f64).to_bits());
+    assert_eq!(decoded[1], f64::INFINITY);
+    assert_eq!(decoded[2], f64::NEG_INFINITY);
+    assert_eq!(decoded[3], 1.25);
+    for invalid in [
+        serde_json::json!(["NaN"]),
+        serde_json::json!([null]),
+        serde_json::json!([true]),
+        serde_json::json!(["1.0"]),
+    ] {
+        assert!(std::panic::catch_unwind(|| support::fixtures::numbers(&invalid)).is_err());
     }
 }

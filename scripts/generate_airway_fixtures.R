@@ -7,8 +7,11 @@ suppressPackageStartupMessages(library(jsonlite))
 
 script <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[1])
 root <- normalizePath(file.path(dirname(script), ".."))
+source(file.path(root, "scripts", "oracle_json.R"))
+file_sha256 <- function(path) strsplit(system2("shasum", c("-a", "256", shQuote(path)), stdout = TRUE), "[[:space:]]+")[[1]][[1]]
 args <- commandArgs(TRUE)
 out <- if (length(args)) args[[1]] else file.path(root, "fixtures", "deseq_airway", "cases.json")
+reference_out <- if (length(args) >= 2L) args[[2]] else if (length(args)) file.path(dirname(out), "airway_reference.json") else file.path(root, "fixtures", "native_r462", "airway_reference.json")
 data("airway", package = "airway")
 dds <- DESeqDataSet(airway, design = ~cell + dex)
 dds <- estimateSizeFactors(dds)
@@ -45,7 +48,7 @@ write_json(inputs, input_path, auto_unbox = TRUE, digits = 17)
 # One IRLS iteration deliberately exercises DESeq2's real fallback on unchanged
 # published counts; stats::optim still receives its default maxit=100 controls.
 status <- system2(file.path(R.home("bin"), "Rscript"),
-                  c(shQuote(file.path(root, "scripts", "baseline_deseq2_r461.R")),
+                  c(shQuote(file.path(root, "scripts", "capture_deseq2_reference.R")),
                     shQuote(input_path), shQuote(reference_path)),
                   env = "DESEQ2_BASELINE_MAXIT=1")
 stopifnot(status == 0)
@@ -63,8 +66,17 @@ inputs$source <- list(url = "https://bioconductor.org/packages/airway/",
                      accession = "GSE52778", doi = "10.1371/journal.pone.0099625",
                      package_version = as.character(packageVersion("airway")),
                      selection = "8 depth ranks, 4 largest treatment imbalances, 4 sparsest genes; deduplicated by count profile")
-inputs$reference <- reference
+inputs$generator <- "scripts/generate_airway_fixtures.R"
+inputs$generator_sha256 <- file_sha256(script)
 dir.create(dirname(out), recursive = TRUE, showWarnings = FALSE)
-write_json(inputs, out, pretty = TRUE, auto_unbox = TRUE, digits = 17, null = "null")
+write_verified_oracle_json(inputs, out)
+# Capture against the final committed inputs so the reference pins their bytes.
+status <- system2(file.path(R.home("bin"), "Rscript"),
+                  c(shQuote(file.path(root, "scripts", "capture_deseq2_reference.R")),
+                    shQuote(out), shQuote(reference_out)),
+                  env = "DESEQ2_BASELINE_MAXIT=1")
+stopifnot(status == 0)
+final_reference <- read_json(reference_out, simplifyVector = FALSE)
+stopifnot(identical(reference$results, final_reference$results))
 unlink(c(input_path, reference_path))
 cat("Wrote published airway fixtures to ", out, "\n", sep = "")

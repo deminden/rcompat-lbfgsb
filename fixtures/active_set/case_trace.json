@@ -2,7 +2,7 @@
   "schema": 1,
   "identity": "active_set_cache_rounding",
   "id": "ill_conditioned_quadratic:11:mixed:1:FALSE",
-  "arithmetic_profile": "r461-macos-arm-openblas-0.3.34",
+  "arithmetic_profile": "apple-silicon-openblas-0.3.34",
   "r_version": "R version 4.6.2 (2026-10-29)",
   "platform": "aarch64-apple-darwin27.2.0",
   "blas": "/Users/dendem/miniforge3/envs/deseq2-r462-native/lib/libopenblas.0.dylib",
@@ -36,8 +36,8 @@
     "FFLAGS": "-O3 -mcpu=native -fPIC"
   },
   "generator": "scripts/extract_active_set_trace.py",
-  "generator_sha256": "fd637cfae85e0b1ab62ff861be15e85aa11293a98901e57f3969b406aab28299",
-  "input_sha256": "2f0f7495326be3e871887ebf168f3718c15caf340ccf83b87869f02b2bba4fd8",
+  "generator_sha256": "656a1b751e4b66f68e2c478de48a0308047f63bcc026524ca73ce314e1e10667",
+  "input_sha256": "bea70a22de3640c103e14ad3f840a197fc5169e0a3498f2dfdc3aa33945fe273",
   "capture": {
     "case": "ill_conditioned_quadratic:11:mixed:1:FALSE",
     "r_version": "R version 4.6.2 (2026-10-29)",
@@ -72,7 +72,7 @@
       "scripts/capture_reference_trace.py": "2511176c21000c64ad98979977090722cd1a6872c7ec7aed1277ad93c1d14134",
       "scripts/oracle_json.R": "6ca84de6b4b0e98c651c880c067b6eb9a355c00e54a3a89b362e6f1f5ec4677a"
     },
-    "fixture_sha256": "2f0f7495326be3e871887ebf168f3718c15caf340ccf83b87869f02b2bba4fd8",
+    "fixture_sha256": "bea70a22de3640c103e14ad3f840a197fc5169e0a3498f2dfdc3aa33945fe273",
     "artifacts": {
       "console.log": "b4c47495f452e55d19a026c9327e592ded35d4133c6dd18a225e08062aba76ec",
       "reference.json": "c99e98619e9c159e73cc72b2a0f3f5e04af06b7a1010b842268f84112e73d04b",

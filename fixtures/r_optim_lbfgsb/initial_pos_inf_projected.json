@@ -14,15 +14,15 @@
   },
   "gradient_supplied": true,
   "result": {
-    "par": [0],
-    "value": 0,
+    "par": [1.7009146492144813e-35],
+    "value": 2.893110643912422e-70,
     "counts": {
-      "function": 4,
-      "gradient": 4
+      "function": 5,
+      "gradient": 5
     },
     "convergence": 0,
-    "message": "CONVERGENCE: NORM OF PROJECTED GRADIENT <= PGTOL"
+    "message": "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
   },
-  "r_version": "R version 4.6.1 (2026-06-24)",
-  "platform": "x86_64-conda-linux-gnu"
+  "r_version": "R version 4.6.2 (2026-10-29)",
+  "platform": "aarch64-apple-darwin27.2.0"
 }

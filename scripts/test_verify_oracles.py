@@ -9,18 +9,33 @@ import sys
 import tempfile
 import unittest
 
-from verify_oracles import CONFIGS, ROOT
+from verify_oracles import CONFIGS, ROOT, RUNTIME_SNAPSHOTS
 
 
 class FrozenOracleGate(unittest.TestCase):
+    def test_standard_payload_and_manifest_corruption(self):
+        with tempfile.TemporaryDirectory() as folder:
+            destination = Path(folder) / "standard"
+            shutil.copytree(ROOT / "fixtures/r_optim_lbfgsb", destination)
+            command = [sys.executable, str(ROOT / "scripts/verify_oracles.py"), "--standard-directory", str(destination)]
+            self.assertEqual(subprocess.run(command, capture_output=True).returncode, 0)
+            for name in ["active_bounds.json", "manifest.json"]:
+                path = destination / name
+                original = path.read_bytes()
+                path.write_bytes(original + b" ")
+                process = subprocess.run(command, capture_output=True, text=True)
+                self.assertNotEqual(process.returncode, 0)
+                self.assertIn("standard fixture", process.stderr)
+                path.write_bytes(original)
+
     def test_runtime_snapshot_corruption(self):
         with tempfile.TemporaryDirectory() as folder:
             destination = Path(folder)
-            for name in ["r461-macos-arm.json", "r462-macos-arm-native.json"]:
+            for name in list(RUNTIME_SNAPSHOTS):
                 shutil.copyfile(ROOT / "fixtures/reference_environments" / name, destination / name)
             command = [sys.executable, str(ROOT / "scripts/verify_oracles.py"), "--runtime-directory", str(destination)]
             self.assertEqual(subprocess.run(command, capture_output=True).returncode, 0)
-            for name in ["r461-macos-arm.json", "r462-macos-arm-native.json"]:
+            for name in list(RUNTIME_SNAPSHOTS):
                 path = destination / name
                 original = path.read_bytes()
                 data = json.loads(original)
@@ -65,7 +80,8 @@ class FrozenOracleGate(unittest.TestCase):
                 if config.get("top_result"):
                     return f["result"]
                 row=f[config["field"]][0]
-                return row["result"] if config["field"]=="cases" else row["optimizer_result"]
+                if config.get("nested"): row=row[config["nested"]][0]
+                return row["result"] if config["field"]=="cases" or config.get("nested") else row["optimizer_result"]
             def mutate_counts(f):
                 counts=result(f)["counts"]
                 counts[0 if isinstance(counts,list) else "function"]=999

@@ -63,27 +63,13 @@ impl NativeBackend {
             let mut retried_search = false;
             let (step, direction, initial_derivative) = loop {
                 let choice = state
-                    .direction(
-                        &x,
-                        &gradient,
-                        lower,
-                        upper,
-                        projected_norm,
-                        MAIN_PATH_MIN_STEP,
-                    )
+                    .direction(&x, &gradient, lower, upper, projected_norm)
                     .or_else(|reason| {
                         if P::OBSERVED {
                             problem.observe(OptimEvent::MemoryReset { iteration, reason });
                         }
                         state.clear_history();
-                        state.direction(
-                            &x,
-                            &gradient,
-                            lower,
-                            upper,
-                            projected_norm,
-                            MAIN_PATH_MIN_STEP,
-                        )
+                        state.direction(&x, &gradient, lower, upper, projected_norm)
                     })
                     .unwrap_or_else(|reason| {
                         if P::OBSERVED {
@@ -92,7 +78,6 @@ impl NativeBackend {
                         DirectionChoice {
                             direction: steepest_projected_direction(&x, &gradient, lower, upper),
                             unit_step_target: None,
-                            refresh_history: false,
                         }
                     });
                 let mut direction = choice.direction;
@@ -145,9 +130,8 @@ impl NativeBackend {
                         .as_ref()
                         .map(|point| exact_bound_count(point, lower, upper));
                     eprintln!(
-                        "direction_inf={:.3e} target_active={target_active:?} refresh_history={}",
-                        norm_inf(&direction),
-                        choice.refresh_history
+                        "direction_inf={:.3e} target_active={target_active:?}",
+                        norm_inf(&direction)
                     );
                 }
                 let initial_derivative = control.profile.dot(true, &gradient, &direction);
@@ -166,17 +150,9 @@ impl NativeBackend {
                         None
                     },
                     cap_initial_unbounded_step: iteration == 1 && !finite_box,
-                    initial_step_cap: None,
-                    #[cfg(test)]
-                    allow_quadratic_interpolation: !state.has_history(),
                     allow_retry_warning_accept: retried_search,
                     min_step: MAIN_PATH_MIN_STEP,
                     exact_operations: true,
-                    #[cfg(test)]
-                    quadratic_interpolation_damping: quadratic_interpolation_damping(
-                        control,
-                        x.len(),
-                    ),
                 };
                 let evaluations_before_search = counts.function;
                 match more_thuente_line_search(problem, request, &mut counts)? {

@@ -9,9 +9,12 @@ fn published_airway_fallback_fixture_preserves_the_public_fit_contract() {
         serde_json::from_str(include_str!("../fixtures/deseq_airway/cases.json")).unwrap();
     assert_eq!(fixture["source"]["accession"], "GSE52778");
     assert_eq!(fixture["source"]["package_version"], "1.32.0");
-    let reference = &fixture["reference"];
+    let reference: Value = serde_json::from_str(include_str!(
+        "../fixtures/native_r462/airway_reference.json"
+    ))
+    .unwrap();
     assert_eq!(reference["deseq2_version"], "1.52.0");
-    assert!(reference["r_version"].as_str().unwrap().contains("4.6.1"));
+    assert!(reference["r_version"].as_str().unwrap().contains("4.6.2"));
     assert_eq!(reference["maxit"], 1);
     let fits = reference["results"].as_array().unwrap();
     assert_eq!(fits.len(), 28);

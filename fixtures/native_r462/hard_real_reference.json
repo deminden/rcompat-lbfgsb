@@ -1,8 +1,8 @@
 {
-  "generator": "scripts/baseline_deseq2_r461.R",
-  "generator_sha256": "daa682e3bbbde9b14eb2abe8d62813f32da11fa08a11b8862e74eb4d17c5909d",
+  "generator": "scripts/capture_deseq2_reference.R",
+  "generator_sha256": "523640c1d87f7e39662af4733e06ecbb82590426c2d9a2e56abfc0193d89b235",
   "serializer_sha256": "6ca84de6b4b0e98c651c880c067b6eb9a355c00e54a3a89b362e6f1f5ec4677a",
-  "input_sha256": "9642f70e992aacc77749d16462bdcce23f9fa0191571109e730c606d4c10c01e",
+  "input_sha256": "3a8e5eb3ecef8e9e0bd3316a04a4691534e28a17c3fcb0758efb659f78b0368c",
   "blas": "/Users/dendem/miniforge3/envs/deseq2-r462-native/lib/libopenblas.0.dylib",
   "threads": "1",
   "build_config": {

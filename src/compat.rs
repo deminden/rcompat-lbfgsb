@@ -131,8 +131,6 @@ where
         lmm: control.lmm,
         trace: control.trace,
         report: control.report,
-        #[cfg(test)]
-        has_user_gradient: gradient.is_some(),
     };
 
     let mut problem = ScaledProblem::new(

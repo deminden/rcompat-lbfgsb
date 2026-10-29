@@ -5,6 +5,7 @@ Builds the dependency-free library in a temporary directory. This checks feature
 isolation, not parity with an external R oracle. Run from any working directory.
 """
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 
@@ -12,7 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 PROBE = r'''
 use rcompat_lbfgsb::*;
 fn main() {
-    for profile in [ArithmeticProfile::R461X86, ArithmeticProfile::R461MacArm] {
+    for profile in [ArithmeticProfile::X86OpenBlas, ArithmeticProfile::AppleSiliconOpenBlas] {
         for numeric in [false,true] { for route in 0..3 {
             let mut bounds = Bounds::new(vec![-5.0;2],vec![5.0;2]).unwrap();
             if route == 1 { bounds.lower[0]=f64::NEG_INFINITY; }
@@ -31,6 +32,7 @@ fn main() {
 
 
 def main():
+    edition = re.search(r'^edition\s*=\s*"(\d+)"', (ROOT / "Cargo.toml").read_text(), re.MULTILINE).group(1)
     outputs = []
     with tempfile.TemporaryDirectory(prefix="rcompat-feature-check-") as temporary:
         directory = Path(temporary)
@@ -40,10 +42,10 @@ def main():
             library = directory / "librcompat_lbfgsb.rlib"
             executable = directory / "probe"
             cfg = ["--cfg", 'feature="arm-fma"'] if arm_feature else []
-            subprocess.run(["rustc", "--edition=2021", "--crate-name", "rcompat_lbfgsb",
+            subprocess.run(["rustc", f"--edition={edition}", "--crate-name", "rcompat_lbfgsb",
                             "--crate-type", "lib", "-O", *cfg, str(ROOT / "src/lib.rs"),
                             "-o", str(library)], check=True)
-            subprocess.run(["rustc", "--edition=2021", "-O", str(probe), "--extern",
+            subprocess.run(["rustc", f"--edition={edition}", "-O", str(probe), "--extern",
                             "rcompat_lbfgsb=" + str(library), "-o", str(executable)], check=True)
             outputs.append(subprocess.check_output([str(executable)], text=True))
     if outputs[0] != outputs[1]:

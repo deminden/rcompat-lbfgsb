@@ -91,8 +91,8 @@
          }
  
          let objective = &mut self.objective;
---- a/benches/api_options.rs
-+++ b/benches/api_options.rs
+--- a/benches/api_options/adapters.rs
++++ b/benches/api_options/adapters.rs
 @@ -161,7 +161,7 @@
                  let value = self.scaling.user_value_to_internal(value)?;
                  let gradient = self

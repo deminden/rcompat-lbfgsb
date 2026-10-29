@@ -94,7 +94,10 @@ fn parameter_objective_and_maximization_transformations_preserve_every_run_bit()
     let mut checked = 0;
     for n in [1, 2, 9, 10, 11, 13, 128] {
         for route in 0..3 {
-            for profile in [ArithmeticProfile::R461X86, ArithmeticProfile::R461MacArm] {
+            for profile in [
+                ArithmeticProfile::X86OpenBlas,
+                ArithmeticProfile::AppleSiliconOpenBlas,
+            ] {
                 for numeric in [false, true] {
                     if numeric && n > 13 {
                         continue;
@@ -107,14 +110,17 @@ fn parameter_objective_and_maximization_transformations_preserve_every_run_bit()
                                     replay(n, route, numeric, profile, pattern, sign * units);
                                 let issues =
                                     support::compare(&actual, &expected, support::Contract::Exact);
-                                assert!(issues.is_empty(),"n={n} route={route} numeric={numeric} profile={profile:?} pattern={pattern} units={units} sign={sign}: {}",issues.join("; "));
+                                assert!(
+                                    issues.is_empty(),
+                                    "n={n} route={route} numeric={numeric} profile={profile:?} pattern={pattern} units={units} sign={sign}: {}",
+                                    issues.join("; ")
+                                );
                                 assert_eq!(calls.len(), expected_calls.len());
                                 for (a, b) in calls.iter().zip(&expected_calls) {
                                     assert_eq!(a.len(), b.len());
-                                    assert!(a
-                                        .iter()
-                                        .zip(b)
-                                        .all(|(a, b)| a.to_bits() == b.to_bits()));
+                                    assert!(
+                                        a.iter().zip(b).all(|(a, b)| a.to_bits() == b.to_bits())
+                                    );
                                 }
                                 checked += 1;
                             }

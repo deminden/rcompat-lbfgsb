@@ -21,8 +21,8 @@ pub struct OptimControl {
     pub pgtol: f64,
     /// Limited-memory history size.
     pub lmm: usize,
-    /// Trace verbosity level. Exact R trace output is not implemented yet, but
-    /// backend diagnostics include line-search and model-step details.
+    /// Verbosity for backend line-search and model-step diagnostics.
+    /// Uses crate-specific text output.
     pub trace: usize,
     /// Trace reporting interval.
     pub report: usize,

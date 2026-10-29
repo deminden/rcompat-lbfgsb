@@ -24,8 +24,7 @@ def capture(prefix):
     expression = r'''
 packages <- c("DESeq2", "jsonlite", "Rcpp", "RcppArmadillo")
 description <- lapply(packages, function(p) {
-  d <- packageDescription(p)
-  list(version=as.character(packageVersion(p)), built=d$Built,
+  list(version=as.character(packageVersion(p)),
        libraries=I(list.files(system.file("libs", package=p), full.names=TRUE)))
 })
 names(description) <- packages
@@ -58,13 +57,6 @@ cat(jsonlite::toJSON(list(
     for package in runtime["packages"].values():
         paths.extend(package["libraries"])
     binaries = {name: digest(name) for name in sorted(set(paths))}
-    # Distribution records identify exact bootstrap archives. Native R/DESeq2
-    # replacements are identified by their runtime/build records and hashes.
-    distribution = []
-    for record in sorted((prefix / "conda-meta").glob("*.json")):
-        data = json.loads(record.read_text())
-        distribution.append({key: data[key] for key in
-                             ["name", "version", "build", "subdir", "url", "sha256", "md5"] if key in data})
     cpu = "Apple Silicon" if platform.system() == "Darwin" and platform.machine() in ("arm64", "aarch64") else platform.machine()
     return {
         "generator": "scripts/capture_reference_environment.py",
@@ -74,8 +66,7 @@ cat(jsonlite::toJSON(list(
         "runtime": runtime, "configured_build": config,
         "configured_compiler_versions": compilers,
         "compiler_scope": "R CMD config and currently installed compiler versions. These do not establish the original compiler of a prebuilt distribution archive.",
-        "binary_sha256": binaries, "bootstrap_distribution": distribution,
-        "distribution_scope": "Conda bootstrap archives; external source-built replacements are authoritative through their separate build recipes and runtime fingerprints.",
+        "binary_sha256": binaries,
         "source_boundary": "Only runtime output, package metadata, configuration and binary hashes were read. No optimizer implementation source was inspected.",
     }
 
